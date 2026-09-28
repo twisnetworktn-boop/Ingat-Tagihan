@@ -213,7 +213,7 @@ export default function CatatanScreen() {
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Utang dan pengeluaran rutin, tersimpan rapi di sini.</Text>
         <TopMenu active="notes" />
 
-        <LinearGradient colors={[colors.primaryGlass, colors.primaryGlassDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.summary, { borderColor: colors.border }]}>
+        <LinearGradient colors={[colors.dashboardGlass, colors.dashboardGlassDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.summary, { borderColor: colors.border }]}>
           <View style={styles.summaryHeader}><Text style={[styles.summaryEyebrow, { color: colors.primaryForeground }]}>SEKILAS CATATAN</Text><Feather name="book-open" size={20} color={colors.primaryForeground} /></View>
           <View style={styles.summaryColumns}>
             <View style={styles.summaryColumn}><Text style={[styles.summaryLabel, { color: colors.primaryForeground }]}>Perlu kubayar</Text><Text numberOfLines={1} adjustsFontSizeToFit style={[styles.summaryNumber, { color: colors.primaryForeground }]}>{formatRupiah(oweTotal)}</Text></View>

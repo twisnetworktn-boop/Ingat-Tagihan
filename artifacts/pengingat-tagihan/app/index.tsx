@@ -236,7 +236,7 @@ export default function HomeScreen() {
       <TopMenu active="bills" />
 
       <LinearGradient
-        colors={[colors.primaryGlass, colors.primaryGlassDeep]}
+        colors={[colors.dashboardGlass, colors.dashboardGlassDeep]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.summaryCard, { borderColor: colors.border }]}
