@@ -34,7 +34,7 @@ Aplikasi mobile offline untuk mencatat berbagai tagihan, memantau jatuh tempo, d
 
 ## User preferences
 
-- Keep the app simple, modern, and fully usable offline. Use a purple palette with translucent surfaces and restrained corner rounding.
+- Keep the app simple, modern, and fully usable offline. Use a purple palette with translucent surfaces, restrained corner rounding, and sea-blue action buttons.
 
 ## Gotchas
 

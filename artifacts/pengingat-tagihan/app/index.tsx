@@ -99,13 +99,13 @@ function BillCard({
             style={({ pressed }) => [
               styles.statusButton,
               {
-                borderColor: bill.isPaid ? colors.primary : colors.border,
-                backgroundColor: bill.isPaid ? colors.primary : 'transparent',
+                borderColor: bill.isPaid ? colors.action : colors.border,
+                backgroundColor: bill.isPaid ? colors.action : 'transparent',
               },
               pressed && styles.pressed,
             ]}
           >
-            {bill.isPaid ? <Feather name="check" size={14} color={colors.primaryForeground} /> : null}
+            {bill.isPaid ? <Feather name="check" size={14} color={colors.actionForeground} /> : null}
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -204,9 +204,9 @@ export default function HomeScreen() {
           accessibilityRole="button"
           accessibilityLabel="Tambah tagihan"
           onPress={() => router.push('/bill-form')}
-          style={({ pressed }) => [styles.headerAddButton, { backgroundColor: colors.secondary }, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.headerAddButton, { backgroundColor: colors.actionSoft }, pressed && styles.pressed]}
         >
-          <Feather name="plus" size={20} color={colors.primary} />
+          <Feather name="plus" size={20} color={colors.action} />
         </Pressable>
       </View>
 
@@ -270,11 +270,11 @@ export default function HomeScreen() {
               onPress={() => setFilter(key)}
               style={({ pressed }) => [
                 styles.filterChip,
-                { backgroundColor: selected ? colors.primary : colors.card, borderColor: selected ? colors.primary : colors.border },
+                { backgroundColor: selected ? colors.action : colors.card, borderColor: selected ? colors.action : colors.border },
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={[styles.filterText, { color: selected ? colors.primaryForeground : colors.mutedForeground }]}>
+              <Text style={[styles.filterText, { color: selected ? colors.actionForeground : colors.mutedForeground }]}>
                 {label}
               </Text>
             </Pressable>
@@ -303,10 +303,10 @@ export default function HomeScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/bill-form')}
-          style={({ pressed }) => [styles.emptyAction, { backgroundColor: colors.primary }, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.emptyAction, { backgroundColor: colors.action }, pressed && styles.pressed]}
         >
-          <Feather name="plus" size={16} color={colors.primaryForeground} />
-          <Text style={[styles.emptyActionText, { color: colors.primaryForeground }]}>Tambah tagihan</Text>
+          <Feather name="plus" size={16} color={colors.actionForeground} />
+          <Text style={[styles.emptyActionText, { color: colors.actionForeground }]}>Tambah tagihan</Text>
         </Pressable>
       ) : null}
     </View>
@@ -327,8 +327,8 @@ export default function HomeScreen() {
         <Feather name="alert-circle" size={28} color={colors.destructive} />
         <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Tagihan belum bisa dibuka</Text>
         <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>{error}</Text>
-        <Pressable onPress={() => void reload()} style={[styles.emptyAction, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.emptyActionText, { color: colors.primaryForeground }]}>Coba lagi</Text>
+        <Pressable onPress={() => void reload()} style={[styles.emptyAction, { backgroundColor: colors.action }]}>
+          <Text style={[styles.emptyActionText, { color: colors.actionForeground }]}>Coba lagi</Text>
         </Pressable>
       </View>
     );
@@ -375,12 +375,12 @@ export default function HomeScreen() {
           onPress={() => router.push('/bill-form')}
           style={({ pressed }) => [
             styles.floatingButton,
-            { backgroundColor: colors.primary, shadowColor: colors.primary, bottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 18 },
+            { backgroundColor: colors.action, shadowColor: colors.action, bottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 18 },
             pressed && styles.pressed,
           ]}
         >
-          <Feather name="plus" size={19} color={colors.primaryForeground} />
-          <Text style={[styles.floatingButtonText, { color: colors.primaryForeground }]}>Tambah tagihan</Text>
+          <Feather name="plus" size={19} color={colors.actionForeground} />
+          <Text style={[styles.floatingButtonText, { color: colors.actionForeground }]}>Tambah tagihan</Text>
         </Pressable>
       ) : null}
     </View>
@@ -416,8 +416,8 @@ const styles = StyleSheet.create({
   errorBanner: { borderRadius: 7, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   errorBannerText: { flex: 1, fontSize: 11, fontFamily: 'Inter_500Medium' },
   filters: { flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 15 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 6, borderWidth: 1 },
-  filterText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  filterChip: { flex: 1, minWidth: 0, alignItems: 'center', paddingHorizontal: 4, paddingVertical: 9, borderRadius: 6, borderWidth: 1 },
+  filterText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   billCard: { borderRadius: 9, borderWidth: 1, padding: 15 },
   billTop: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   categoryIcon: { width: 42, height: 42, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },

@@ -298,8 +298,8 @@ export default function BillFormScreen() {
             accessibilityLabel="Aktifkan pengingat lokal"
             value={remind}
             onValueChange={(value) => void toggleReminder(value)}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === 'android' ? (remind ? colors.primaryForeground : colors.card) : undefined}
+            trackColor={{ false: colors.border, true: colors.action }}
+            thumbColor={Platform.OS === 'android' ? (remind ? colors.actionForeground : colors.card) : undefined}
             disabled={saving}
             testID="bill-reminder-switch"
           />
@@ -342,17 +342,17 @@ export default function BillFormScreen() {
           onPress={() => void submit()}
           style={({ pressed }) => [
             styles.saveButton,
-            { backgroundColor: colors.primary, opacity: saving ? 0.65 : 1 },
+            { backgroundColor: colors.action, opacity: saving ? 0.65 : 1 },
             pressed && !saving ? styles.pressed : null,
           ]}
           testID="save-bill"
         >
           {saving ? (
-            <Text style={[styles.saveButtonText, { color: colors.primaryForeground }]}>Menyimpan...</Text>
+            <Text style={[styles.saveButtonText, { color: colors.actionForeground }]}>Menyimpan...</Text>
           ) : (
             <>
-              <Feather name="check" size={17} color={colors.primaryForeground} />
-              <Text style={[styles.saveButtonText, { color: colors.primaryForeground }]}>
+              <Feather name="check" size={17} color={colors.actionForeground} />
+              <Text style={[styles.saveButtonText, { color: colors.actionForeground }]}>
                 {existing ? 'Simpan perubahan' : 'Simpan tagihan'}
               </Text>
             </>
@@ -388,8 +388,8 @@ const styles = StyleSheet.create({
   categoryOption: { minWidth: '30%', flexGrow: 1, flexBasis: '30%', minHeight: 43, borderRadius: 7, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 8 },
   categoryText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   datePresets: { flexDirection: 'row', gap: 8 },
-  datePreset: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 7 },
-  datePresetText: { fontFamily: 'Inter_500Medium', fontSize: 10 },
+  datePreset: { flex: 1, minWidth: 0, alignItems: 'center', borderRadius: 6, borderWidth: 1, paddingHorizontal: 4, paddingVertical: 7 },
+  datePresetText: { fontFamily: 'Inter_500Medium', fontSize: 10, textAlign: 'center' },
   reminderRow: { borderRadius: 9, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11 },
   reminderIcon: { width: 36, height: 36, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   reminderCopy: { flex: 1, minWidth: 0 },
