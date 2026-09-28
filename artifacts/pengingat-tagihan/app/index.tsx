@@ -17,51 +17,54 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BILL_CATEGORIES, type Bill, useBills } from '@/contexts/BillsContext';
 import { SurfaceBackground } from '@/components/SurfaceBackground';
 import { useColors } from '@/hooks/useColors';
-import { formatDueLabel, formatRupiah, getDaysUntilDue, sortBills } from '@/lib/bill-format';
+import { formatDateInput, formatDueLabel, formatRupiah, formatShortDate, getDaysUntilDue, getNextMonthlyDueDate, sortBills } from '@/lib/bill-format';
 
 type Filter = 'all' | 'unpaid' | 'paid';
 
 function BillCard({
   bill,
   onOpen,
-  onTogglePaid,
+  onMarkPaid,
   onDelete,
 }: {
   bill: Bill;
   onOpen: () => void;
-  onTogglePaid: () => void;
+  onMarkPaid: () => void;
   onDelete: () => void;
 }) {
   const colors = useColors();
   const category = BILL_CATEGORIES.find((item) => item.id === bill.category) ?? BILL_CATEGORIES[5];
   const daysUntilDue = getDaysUntilDue(bill.dueDate);
   const isOverdue = !bill.isPaid && daysUntilDue < 0;
+  const paidLabel = bill.paidAt
+    ? `Lunas · ${new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(bill.paidAt))}`
+    : 'Lunas';
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${bill.title}, ${formatRupiah(bill.amount)}, ${formatDueLabel(bill.dueDate)}`}
-      onPress={onOpen}
-      style={({ pressed }) => [
-        styles.billCard,
-        { backgroundColor: colors.card, borderColor: colors.border },
-        pressed && styles.pressed,
-      ]}
-    >
-      <View style={styles.billTop}>
-        <View style={[styles.categoryIcon, { backgroundColor: bill.isPaid ? colors.muted : colors.secondary }]}>
-          <Feather name={category.icon} size={18} color={bill.isPaid ? colors.mutedForeground : colors.primary} />
-        </View>
-        <View style={styles.billMain}>
-          <Text numberOfLines={1} style={[styles.billTitle, { color: colors.foreground }]}>
-            {bill.title}
+    <View style={[styles.billCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${bill.title}, ${formatRupiah(bill.amount)}, ${bill.isPaid ? paidLabel : formatDueLabel(bill.dueDate)}`}
+        onPress={onOpen}
+        style={({ pressed }) => pressed && styles.pressed}
+      >
+        <View style={styles.billTop}>
+          <View style={[styles.categoryIcon, { backgroundColor: bill.isPaid ? colors.muted : colors.secondary }]}>
+            <Feather name={category.icon} size={18} color={bill.isPaid ? colors.mutedForeground : colors.primary} />
+          </View>
+          <View style={styles.billMain}>
+            <Text numberOfLines={1} style={[styles.billTitle, { color: colors.foreground }]}>
+              {bill.title}
+            </Text>
+            <Text numberOfLines={1} style={[styles.billCategory, { color: colors.mutedForeground }]}>
+              {bill.isPaid ? `${category.label} · Jatuh tempo ${formatShortDate(bill.dueDate)}` : category.label}
+            </Text>
+          </View>
+          <Text style={[styles.amount, { color: colors.foreground }, bill.isPaid && styles.paidText]}>
+            {formatRupiah(bill.amount)}
           </Text>
-          <Text style={[styles.billCategory, { color: colors.mutedForeground }]}>{category.label}</Text>
         </View>
-        <Text style={[styles.amount, { color: colors.foreground }, bill.isPaid && styles.paidText]}>
-          {formatRupiah(bill.amount)}
-        </Text>
-      </View>
+      </Pressable>
 
       <View style={[styles.billDivider, { backgroundColor: colors.border }]} />
 
@@ -78,7 +81,7 @@ function BillCard({
               { color: bill.isPaid ? colors.primary : isOverdue ? colors.destructive : colors.mutedForeground },
             ]}
           >
-            {bill.isPaid ? 'Lunas' : formatDueLabel(bill.dueDate)}
+            {bill.isPaid ? paidLabel : formatDueLabel(bill.dueDate)}
           </Text>
         </View>
         {bill.remind && !bill.isPaid ? (
@@ -88,47 +91,38 @@ function BillCard({
           </View>
         ) : null}
         <View style={styles.cardActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={bill.isPaid ? 'Tandai belum lunas' : 'Tandai sudah lunas'}
-            hitSlop={10}
-            onPress={(event) => {
-              event.stopPropagation();
-              onTogglePaid();
-            }}
-            style={({ pressed }) => [
-              styles.statusButton,
-              {
-                borderColor: bill.isPaid ? colors.action : colors.border,
-                backgroundColor: bill.isPaid ? colors.action : 'transparent',
-              },
-              pressed && styles.pressed,
-            ]}
-          >
-            {bill.isPaid ? <Feather name="check" size={14} color={colors.actionForeground} /> : null}
-          </Pressable>
+          {bill.isPaid ? (
+            <View accessibilityLabel="Pembayaran tercatat" style={[styles.statusButton, { borderColor: colors.action, backgroundColor: colors.action }]}>
+              <Feather name="check" size={14} color={colors.actionForeground} />
+            </View>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Konfirmasi pembayaran ${bill.title}`}
+              hitSlop={10}
+              onPress={onMarkPaid}
+              style={({ pressed }) => [styles.statusButton, { borderColor: colors.border, backgroundColor: 'transparent' }, pressed && styles.pressed]}
+            />
+          )}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Hapus ${bill.title}`}
             hitSlop={10}
-            onPress={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
+            onPress={onDelete}
             style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
           >
             <Feather name="trash-2" size={15} color={colors.mutedForeground} />
           </Pressable>
         </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { bills, loading, error, reload, deleteBill, togglePaid } = useBills();
+  const { bills, loading, error, reload, deleteBill, markPaid } = useBills();
   const [filter, setFilter] = useState<Filter>('all');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -158,22 +152,44 @@ export default function HomeScreen() {
   }, [bills, filter]);
 
   const removeBill = (bill: Bill) => {
-    Alert.alert('Hapus tagihan?', `${bill.title} akan dihapus dari daftar.`, [
+    const message = bill.isPaid
+      ? `Catatan pembayaran ${bill.title} akan dihapus permanen dari riwayat.`
+      : `${bill.title} akan dihapus dan tidak berulang lagi. Riwayat pembayaran sebelumnya tetap tersimpan.`;
+    const confirmDelete = () => {
+      void deleteBill(bill.id).catch((cause: unknown) => {
+        const errorMessage = cause instanceof Error ? cause.message : 'Tagihan belum bisa dihapus.';
+        if (Platform.OS === 'web') window.alert(errorMessage);
+        else Alert.alert('Belum berhasil', errorMessage);
+      });
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Hapus tagihan?\n\n${message}`)) confirmDelete();
+      return;
+    }
+    Alert.alert('Hapus tagihan?', message, [
       { text: 'Batal', style: 'cancel' },
-      {
-        text: 'Hapus',
-        style: 'destructive',
-        onPress: () => void deleteBill(bill.id).catch((cause: unknown) => {
-          Alert.alert('Belum berhasil', cause instanceof Error ? cause.message : 'Tagihan belum bisa dihapus.');
-        }),
-      },
+      { text: 'Hapus', style: 'destructive', onPress: confirmDelete },
     ]);
   };
 
   const changePaid = (bill: Bill) => {
-    void togglePaid(bill.id).catch((cause: unknown) => {
-      Alert.alert('Belum berhasil', cause instanceof Error ? cause.message : 'Status tagihan belum bisa diubah.');
-    });
+    const nextDate = getNextMonthlyDueDate(bill.dueDate, bill.recurrenceDay ?? Number(bill.dueDate.slice(-2)));
+    const message = `${bill.title} akan disimpan di riwayat lunas. Tagihan berikutnya otomatis dibuat untuk ${formatDateInput(nextDate)}.`;
+    const confirmPayment = () => {
+      void markPaid(bill.id).catch((cause: unknown) => {
+        const errorMessage = cause instanceof Error ? cause.message : 'Pembayaran belum bisa disimpan.';
+        if (Platform.OS === 'web') window.alert(errorMessage);
+        else Alert.alert('Belum berhasil', errorMessage);
+      });
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Konfirmasi pembayaran?\n\n${message}`)) confirmPayment();
+    } else {
+      Alert.alert('Konfirmasi pembayaran?', message, [
+        { text: 'Batal', style: 'cancel' },
+        { text: 'Sudah dibayar', onPress: confirmPayment },
+      ]);
+    }
   };
 
   const handleRefresh = async () => {
@@ -246,7 +262,9 @@ export default function HomeScreen() {
       </LinearGradient>
 
       <View style={styles.listHeading}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Daftar tagihan</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+          {filter === 'paid' ? 'Riwayat lunas' : 'Daftar tagihan'}
+        </Text>
         <Text style={[styles.billCount, { color: colors.mutedForeground }]}>{bills.length}</Text>
       </View>
       {error ? (
@@ -290,7 +308,7 @@ export default function HomeScreen() {
         <Feather name={filter === 'paid' ? 'check-circle' : 'calendar'} size={24} color={colors.primary} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-        {filter === 'paid' ? 'Belum ada tagihan lunas' : filter === 'unpaid' ? 'Semua sudah beres' : 'Belum ada tagihan'}
+        {filter === 'paid' ? 'Belum ada riwayat lunas' : filter === 'unpaid' ? 'Semua sudah beres' : 'Belum ada tagihan'}
       </Text>
       <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>
         {filter === 'paid'
@@ -352,7 +370,7 @@ export default function HomeScreen() {
           <BillCard
             bill={item}
             onOpen={() => router.push({ pathname: '/bill-form', params: { id: item.id } })}
-            onTogglePaid={() => changePaid(item)}
+            onMarkPaid={() => changePaid(item)}
             onDelete={() => removeBill(item)}
           />
         )}

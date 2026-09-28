@@ -110,7 +110,7 @@ export default function BillFormScreen() {
       setFormError('Masukkan tanggal yang valid dengan format YYYY-MM-DD.');
       return;
     }
-    if (remind && getDaysUntilDue(dueDate) < 1) {
+    if (remind && !existing?.isPaid && getDaysUntilDue(dueDate) < 1) {
       setFormError('Untuk pengingat otomatis, pilih jatuh tempo mulai besok.');
       return;
     }
@@ -124,7 +124,6 @@ export default function BillFormScreen() {
         dueDate,
         category,
         note: note.trim(),
-        isPaid: existing?.isPaid ?? false,
         remind,
       });
       router.back();
@@ -282,29 +281,36 @@ export default function BillFormScreen() {
               testID="bill-due-date"
             />
           </View>
+          <Text style={[styles.recurrenceNote, { color: colors.mutedForeground }]}>
+            {existing?.isPaid
+              ? 'Ini riwayat lunas. Tagihan aktif bulan berikutnya tersimpan terpisah.'
+              : 'Berulang setiap bulan setelah dikonfirmasi lunas, sampai tagihan aktif dihapus.'}
+          </Text>
         </View>
 
-        <View style={[styles.reminderRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.reminderIcon, { backgroundColor: colors.accent }]}>
-            <Feather name="bell" size={17} color={colors.accentForeground} />
+        {!existing?.isPaid ? (
+          <View style={[styles.reminderRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.reminderIcon, { backgroundColor: colors.accent }]}>
+              <Feather name="bell" size={17} color={colors.accentForeground} />
+            </View>
+            <View style={styles.reminderCopy}>
+              <Text style={[styles.reminderTitle, { color: colors.foreground }]}>Ingatkan saya</Text>
+              <Text style={[styles.reminderDescription, { color: colors.mutedForeground }]}>
+                H-1 pukul 09.00, atau pagi saat jatuh tempo.
+              </Text>
+            </View>
+            <Switch
+              accessibilityLabel="Aktifkan pengingat lokal"
+              value={remind}
+              onValueChange={(value) => void toggleReminder(value)}
+              trackColor={{ false: colors.border, true: colors.action }}
+              thumbColor={Platform.OS === 'android' ? (remind ? colors.actionForeground : colors.card) : undefined}
+              disabled={saving}
+              testID="bill-reminder-switch"
+            />
           </View>
-          <View style={styles.reminderCopy}>
-            <Text style={[styles.reminderTitle, { color: colors.foreground }]}>Ingatkan saya</Text>
-            <Text style={[styles.reminderDescription, { color: colors.mutedForeground }]}>
-              H-1 pukul 09.00, atau pagi saat jatuh tempo.
-            </Text>
-          </View>
-          <Switch
-            accessibilityLabel="Aktifkan pengingat lokal"
-            value={remind}
-            onValueChange={(value) => void toggleReminder(value)}
-            trackColor={{ false: colors.border, true: colors.action }}
-            thumbColor={Platform.OS === 'android' ? (remind ? colors.actionForeground : colors.card) : undefined}
-            disabled={saving}
-            testID="bill-reminder-switch"
-          />
-        </View>
-        {Platform.OS === 'web' ? (
+        ) : null}
+        {Platform.OS === 'web' && !existing?.isPaid ? (
           <Text style={[styles.platformNote, { color: colors.mutedForeground }]}>
             Pengingat otomatis berjalan di aplikasi ponsel. Pratinjau web hanya menyimpan tagihan.
           </Text>
@@ -390,6 +396,7 @@ const styles = StyleSheet.create({
   datePresets: { flexDirection: 'row', gap: 8 },
   datePreset: { flex: 1, minWidth: 0, alignItems: 'center', borderRadius: 6, borderWidth: 1, paddingHorizontal: 4, paddingVertical: 7 },
   datePresetText: { fontFamily: 'Inter_500Medium', fontSize: 10, textAlign: 'center' },
+  recurrenceNote: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17 },
   reminderRow: { borderRadius: 9, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11 },
   reminderIcon: { width: 36, height: 36, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   reminderCopy: { flex: 1, minWidth: 0 },

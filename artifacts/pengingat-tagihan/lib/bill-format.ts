@@ -14,6 +14,12 @@ export function isValidBillDate(value: string): boolean {
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
+export function getNextMonthlyDueDate(value: string, originalDay: number): string {
+  const [year, month] = value.split('-').map(Number);
+  const lastDayOfNextMonth = new Date(year, month + 1, 0).getDate();
+  return getLocalDateString(new Date(year, month, Math.min(originalDay, lastDayOfNextMonth)));
+}
+
 export function formatRupiah(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -51,9 +57,18 @@ export function formatDateInput(value: string): string {
   }).format(parseLocalDate(value));
 }
 
+export function formatShortDate(value: string): string {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(parseLocalDate(value));
+}
+
 export function sortBills(bills: Bill[]): Bill[] {
   return [...bills].sort((a, b) => {
     if (a.isPaid !== b.isPaid) return Number(a.isPaid) - Number(b.isPaid);
+    if (a.isPaid) return (b.paidAt ?? b.dueDate).localeCompare(a.paidAt ?? a.dueDate);
     return a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, 'id');
   });
 }

@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import * as Notifications from 'expo-notifications';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
+import { getNextMonthlyDueDate } from '@/lib/bill-format';
 
 const STORAGE_KEY = '@ingat-tagihan/bills/v1';
 const ANDROID_CHANNEL_ID = 'bill-reminders';
@@ -33,9 +34,12 @@ export type Bill = {
   isPaid: boolean;
   remind: boolean;
   notificationId?: string;
+  seriesId?: string;
+  recurrenceDay?: number;
+  paidAt?: string;
 };
 
-export type BillInput = Omit<Bill, 'id' | 'notificationId'> & { id?: string };
+export type BillInput = Pick<Bill, 'title' | 'amount' | 'dueDate' | 'category' | 'note' | 'remind'> & { id?: string };
 
 type BillsContextValue = {
   bills: Bill[];
@@ -44,10 +48,14 @@ type BillsContextValue = {
   reload: () => Promise<void>;
   saveBill: (input: BillInput) => Promise<string>;
   deleteBill: (id: string) => Promise<void>;
-  togglePaid: (id: string) => Promise<void>;
+  markPaid: (id: string) => Promise<void>;
 };
 
 const BillsContext = createContext<BillsContextValue | null>(null);
+
+function createBillId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 type ScheduledReminder = {
   date: Date;
@@ -180,8 +188,18 @@ export function BillsProvider({ children }: { children: ReactNode }) {
   const saveBill = useCallback((input: BillInput) => enqueue(async () => {
     const previous = input.id ? billsRef.current.find((bill) => bill.id === input.id) : undefined;
     if (input.id && !previous) throw new Error('Tagihan tidak ditemukan. Buka ulang daftar tagihan.');
-    const id = input.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const nextBill: Bill = { ...input, id, notificationId: undefined };
+    const id = input.id ?? createBillId();
+    const nextBill: Bill = {
+      ...input,
+      id,
+      isPaid: previous?.isPaid ?? false,
+      paidAt: previous?.paidAt,
+      seriesId: previous?.seriesId ?? id,
+      recurrenceDay: previous?.dueDate === input.dueDate
+        ? previous?.recurrenceDay ?? Number(input.dueDate.slice(-2))
+        : Number(input.dueDate.slice(-2)),
+      notificationId: undefined,
+    };
     let newNotificationId: string | undefined;
 
     try {
@@ -209,31 +227,59 @@ export function BillsProvider({ children }: { children: ReactNode }) {
     const deleted = billsRef.current.find((bill) => bill.id === id);
     if (!deleted) return;
     await persist(billsRef.current.filter((bill) => bill.id !== id));
-    await cancelBillReminder(deleted?.notificationId);
+    await cancelBillReminder(deleted.notificationId).catch(() => {
+      setError('Tagihan dihapus, tetapi pengingatnya belum berhasil dibatalkan.');
+    });
   }), [enqueue, persist]);
 
-  const togglePaid = useCallback((id: string) => enqueue(async () => {
+  const markPaid = useCallback((id: string) => enqueue(async () => {
     const bill = billsRef.current.find((item) => item.id === id);
     if (!bill) return;
+    if (bill.isPaid) return;
 
-    const markAsPaid = !bill.isPaid;
-    const updated: Bill = { ...bill, isPaid: markAsPaid, notificationId: undefined };
-    if (!markAsPaid) {
-      updated.notificationId = await scheduleBillReminder(updated);
+    const recurrenceDay = bill.recurrenceDay ?? Number(bill.dueDate.slice(-2));
+    const paid: Bill = {
+      ...bill,
+      isPaid: true,
+      paidAt: new Date().toISOString(),
+      notificationId: undefined,
+      seriesId: bill.seriesId ?? bill.id,
+      recurrenceDay,
+    };
+    const nextBill: Bill = {
+      ...bill,
+      id: createBillId(),
+      dueDate: getNextMonthlyDueDate(bill.dueDate, recurrenceDay),
+      isPaid: false,
+      paidAt: undefined,
+      notificationId: undefined,
+      seriesId: paid.seriesId,
+      recurrenceDay,
+    };
+    let reminderWarning: string | null = null;
+    try {
+      nextBill.notificationId = await scheduleBillReminder(nextBill);
+    } catch {
+      reminderWarning = 'Pembayaran tersimpan, tetapi pengingat tagihan berikutnya belum bisa dijadwalkan. Periksa izin notifikasi.';
     }
 
     try {
-      await persist(billsRef.current.map((item) => (item.id === id ? updated : item)));
+      await persist([nextBill, ...billsRef.current.map((item) => (item.id === id ? paid : item))]);
     } catch (cause) {
-      if (updated.notificationId) await cancelBillReminder(updated.notificationId).catch(() => undefined);
+      if (nextBill.notificationId) await cancelBillReminder(nextBill.notificationId).catch(() => undefined);
       throw cause;
     }
 
-    if (markAsPaid) await cancelBillReminder(bill.notificationId);
+    if (bill.notificationId) {
+      await cancelBillReminder(bill.notificationId).catch(() => {
+        reminderWarning = 'Pembayaran tersimpan, tetapi pengingat lama belum bisa dibatalkan.';
+      });
+    }
+    if (reminderWarning) setError(reminderWarning);
   }), [enqueue, persist]);
 
   return (
-    <BillsContext.Provider value={{ bills, loading, error, reload, saveBill, deleteBill, togglePaid }}>
+    <BillsContext.Provider value={{ bills, loading, error, reload, saveBill, deleteBill, markPaid }}>
       {children}
     </BillsContext.Provider>
   );

@@ -27,6 +27,7 @@ Aplikasi mobile offline untuk mencatat berbagai tagihan, memantau jatuh tempo, d
 
 - Data stays on the device because the app must work without internet. Do not add a server dependency to the core bill flows.
 - Reminder permission is requested only when a user turns on a bill's local reminder.
+- Confirming payment keeps the paid bill as history and creates the next monthly bill. The original due-day anchors months shorter than that day; deleting an active bill stops its series without removing older paid history.
 
 ## Product
 
