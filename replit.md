@@ -1,44 +1,45 @@
-# [Project name]
+# Ingat Tagihan
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Aplikasi mobile offline untuk mencatat berbagai tagihan, memantau jatuh tempo, dan menerima pengingat lokal.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the shared API server through its managed workflow
+- `pnpm --filter @workspace/pengingat-tagihan run dev` — run the Expo mobile app through its managed workflow
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- No credentials or backend are required for the current offline mobile experience.
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Expo Router / React Native / TypeScript
+- AsyncStorage for local persistence; expo-notifications for local reminders
+- The shared API server is present but not used by the mobile app.
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- Mobile screens: `artifacts/pengingat-tagihan/app/`
+- Offline bill state and notification scheduling: `artifacts/pengingat-tagihan/contexts/BillsContext.tsx`
+- Date and currency formatting: `artifacts/pengingat-tagihan/lib/bill-format.ts`
+- Theme tokens: `artifacts/pengingat-tagihan/constants/colors.ts`
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Data stays on the device because the app must work without internet. Do not add a server dependency to the core bill flows.
+- Reminder permission is requested only when a user turns on a bill's local reminder.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Add, edit, delete, and mark bills paid; categorize bills; view due dates and outstanding total; schedule optional local reminders.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Keep the app simple, modern, and fully usable offline.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Web preview supports offline bill storage but local reminder scheduling is for the native mobile app.
+- On Android, create the notification channel before asking for notification permission.
 
 ## Pointers
 

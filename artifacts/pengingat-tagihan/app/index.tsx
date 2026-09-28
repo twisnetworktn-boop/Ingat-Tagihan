@@ -216,24 +216,24 @@ export default function HomeScreen() {
       <View style={[styles.summaryCard, { backgroundColor: colors.primary }]}>
         <View style={styles.summaryTop}>
           <View>
-            <Text style={styles.summaryEyebrow}>TOTAL BELUM DIBAYAR</Text>
-            <Text numberOfLines={1} adjustsFontSizeToFit style={styles.summaryAmount}>
+            <Text style={[styles.summaryEyebrow, { color: colors.primaryForeground }]}>TOTAL BELUM DIBAYAR</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.summaryAmount, { color: colors.primaryForeground }]}>
               {formatRupiah(outstandingTotal)}
             </Text>
           </View>
-          <View style={styles.summaryIcon}>
+          <View style={[styles.summaryIcon, { borderColor: colors.primaryForeground }]}>
             <Feather name="pie-chart" size={20} color={colors.primaryForeground} />
           </View>
         </View>
-        <View style={styles.summaryDivider} />
+        <View style={[styles.summaryDivider, { backgroundColor: colors.primaryForeground }]} />
         <View style={styles.summaryFoot}>
           <View style={styles.summaryStat}>
             <Feather name="file-text" size={14} color={colors.primaryForeground} />
-            <Text style={styles.summaryFootText}>{unpaidBills.length} tagihan aktif</Text>
+            <Text style={[styles.summaryFootText, { color: colors.primaryForeground }]}>{unpaidBills.length} tagihan aktif</Text>
           </View>
           <View style={styles.summaryStat}>
             <Feather name="clock" size={14} color={colors.primaryForeground} />
-            <Text style={styles.summaryFootText}>{dueSoonCount} jatuh tempo dalam 7 hari</Text>
+            <Text style={[styles.summaryFootText, { color: colors.primaryForeground }]}>{dueSoonCount} jatuh tempo dalam 7 hari</Text>
           </View>
         </View>
       </View>
@@ -242,6 +242,12 @@ export default function HomeScreen() {
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Daftar tagihan</Text>
         <Text style={[styles.billCount, { color: colors.mutedForeground }]}>{bills.length}</Text>
       </View>
+      {error ? (
+        <View style={[styles.errorBanner, { backgroundColor: colors.accent }]}>
+          <Feather name="alert-circle" size={14} color={colors.accentForeground} />
+          <Text style={[styles.errorBannerText, { color: colors.accentForeground }]}>{error}</Text>
+        </View>
+      ) : null}
       <View style={styles.filters}>
         {([
           ['all', 'Semua'],
@@ -361,7 +367,7 @@ export default function HomeScreen() {
           onPress={() => router.push('/bill-form')}
           style={({ pressed }) => [
             styles.floatingButton,
-            { backgroundColor: colors.primary, bottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 18 },
+            { backgroundColor: colors.primary, shadowColor: colors.primary, bottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 18 },
             pressed && styles.pressed,
           ]}
         >
@@ -389,16 +395,18 @@ const styles = StyleSheet.create({
   pageSubtitle: { marginTop: 6, fontFamily: 'Inter_400Regular', fontSize: 14 },
   summaryCard: { marginTop: 22, borderRadius: 23, paddingHorizontal: 20, paddingVertical: 19 },
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryEyebrow: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 1.1 },
-  summaryAmount: { color: '#ffffff', marginTop: 8, fontSize: 27, fontFamily: 'Inter_700Bold', letterSpacing: -0.8 },
-  summaryIcon: { width: 40, height: 40, borderRadius: 14, borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  summaryDivider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.24)', marginTop: 17, marginBottom: 13 },
+  summaryEyebrow: { opacity: 0.75, fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 1.1 },
+  summaryAmount: { marginTop: 8, fontSize: 27, fontFamily: 'Inter_700Bold', letterSpacing: -0.8 },
+  summaryIcon: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, opacity: 0.75, alignItems: 'center', justifyContent: 'center' },
+  summaryDivider: { height: StyleSheet.hairlineWidth, opacity: 0.24, marginTop: 17, marginBottom: 13 },
   summaryFoot: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   summaryStat: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  summaryFootText: { color: '#ffffff', fontSize: 11, fontFamily: 'Inter_500Medium' },
+  summaryFootText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
   listHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 28 },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: -0.4 },
   billCount: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  errorBanner: { borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  errorBannerText: { flex: 1, fontSize: 11, fontFamily: 'Inter_500Medium' },
   filters: { flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 15 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 13, borderWidth: 1 },
   filterText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
@@ -426,7 +434,7 @@ const styles = StyleSheet.create({
   emptyCopy: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 7, maxWidth: 280 },
   emptyAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 13, paddingHorizontal: 16, paddingVertical: 12, marginTop: 18 },
   emptyActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  floatingButton: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 19, height: 52, borderRadius: 18, elevation: 5, shadowColor: '#10241f', shadowOpacity: 0.16, shadowOffset: { width: 0, height: 5 }, shadowRadius: 12 },
+  floatingButton: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 19, height: 52, borderRadius: 18, elevation: 5, shadowOpacity: 0.16, shadowOffset: { width: 0, height: 5 }, shadowRadius: 12 },
   floatingButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   pressed: { opacity: 0.78 },
 });

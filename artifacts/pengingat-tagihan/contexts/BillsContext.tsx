@@ -74,21 +74,25 @@ function getReminderDate(dueDate: string): ScheduledReminder | null {
   return { date, isDueDay };
 }
 
-async function requestNotificationPermission(): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
+export async function ensureReminderPermission(): Promise<Notifications.NotificationPermissionsStatus> {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+      name: 'Pengingat tagihan',
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  }
 
   const current = await Notifications.getPermissionsAsync();
-  if (current.granted) return true;
+  if (current.granted) return current;
 
-  const requested = await Notifications.requestPermissionsAsync();
-  return requested.granted;
+  return Notifications.requestPermissionsAsync();
 }
 
 async function scheduleBillReminder(bill: Bill): Promise<string | undefined> {
   if (!bill.remind || bill.isPaid || Platform.OS === 'web') return undefined;
 
-  const permitted = await requestNotificationPermission();
-  if (!permitted) {
+  const permission = await ensureReminderPermission();
+  if (!permission.granted) {
     throw new Error('Izin notifikasi belum aktif. Aktifkan izin notifikasi lalu coba lagi.');
   }
 
@@ -130,6 +134,13 @@ export function BillsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const billsRef = useRef<Bill[]>([]);
+  const mutationQueue = useRef<Promise<void>>(Promise.resolve());
+
+  const enqueue = useCallback(<T,>(operation: () => Promise<T>): Promise<T> => {
+    const result = mutationQueue.current.then(operation);
+    mutationQueue.current = result.then(() => undefined, () => undefined);
+    return result;
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -149,12 +160,6 @@ export function BillsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void reload();
-    if (Platform.OS === 'android') {
-      void Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-        name: 'Pengingat tagihan',
-        importance: Notifications.AndroidImportance.DEFAULT,
-      });
-    }
   }, [reload]);
 
   const persist = useCallback(async (next: Bill[]) => {
@@ -172,8 +177,9 @@ export function BillsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const saveBill = useCallback(async (input: BillInput) => {
+  const saveBill = useCallback((input: BillInput) => enqueue(async () => {
     const previous = input.id ? billsRef.current.find((bill) => bill.id === input.id) : undefined;
+    if (input.id && !previous) throw new Error('Tagihan tidak ditemukan. Buka ulang daftar tagihan.');
     const id = input.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const nextBill: Bill = { ...input, id, notificationId: undefined };
     let newNotificationId: string | undefined;
@@ -197,15 +203,16 @@ export function BillsProvider({ children }: { children: ReactNode }) {
     }
 
     return id;
-  }, [persist]);
+  }), [enqueue, persist]);
 
-  const deleteBill = useCallback(async (id: string) => {
+  const deleteBill = useCallback((id: string) => enqueue(async () => {
     const deleted = billsRef.current.find((bill) => bill.id === id);
+    if (!deleted) return;
     await persist(billsRef.current.filter((bill) => bill.id !== id));
     await cancelBillReminder(deleted?.notificationId);
-  }, [persist]);
+  }), [enqueue, persist]);
 
-  const togglePaid = useCallback(async (id: string) => {
+  const togglePaid = useCallback((id: string) => enqueue(async () => {
     const bill = billsRef.current.find((item) => item.id === id);
     if (!bill) return;
 
@@ -223,7 +230,7 @@ export function BillsProvider({ children }: { children: ReactNode }) {
     }
 
     if (markAsPaid) await cancelBillReminder(bill.notificationId);
-  }, [persist]);
+  }), [enqueue, persist]);
 
   return (
     <BillsContext.Provider value={{ bills, loading, error, reload, saveBill, deleteBill, togglePaid }}>

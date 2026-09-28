@@ -1,6 +1,5 @@
 import { Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
@@ -14,9 +13,9 @@ import {
   View,
 } from 'react-native';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
-import { BILL_CATEGORIES, type BillCategory, useBills } from '@/contexts/BillsContext';
+import { BILL_CATEGORIES, ensureReminderPermission, type BillCategory, useBills } from '@/contexts/BillsContext';
 import { useColors } from '@/hooks/useColors';
-import { formatDateInput, formatRupiah, getLocalDateString, isValidBillDate } from '@/lib/bill-format';
+import { formatDateInput, formatRupiah, getDaysUntilDue, getLocalDateString, isValidBillDate } from '@/lib/bill-format';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type DatePreset = { label: string; offset: number };
@@ -59,8 +58,7 @@ export default function BillFormScreen() {
     }
 
     try {
-      const current = await Notifications.getPermissionsAsync();
-      const permission = current.granted ? current : await Notifications.requestPermissionsAsync();
+      const permission = await ensureReminderPermission();
       if (permission.granted) {
         setRemind(true);
         return;
@@ -108,6 +106,10 @@ export default function BillFormScreen() {
     }
     if (!dateValid) {
       setFormError('Masukkan tanggal yang valid dengan format YYYY-MM-DD.');
+      return;
+    }
+    if (remind && getDaysUntilDue(dueDate) < 1) {
+      setFormError('Untuk pengingat otomatis, pilih jatuh tempo mulai besok.');
       return;
     }
 
@@ -171,23 +173,23 @@ export default function BillFormScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.amountCard, { backgroundColor: colors.primary }]}>
-          <Text style={styles.amountLabel}>NOMINAL TAGIHAN</Text>
+          <Text style={[styles.amountLabel, { color: colors.primaryForeground }]}>NOMINAL TAGIHAN</Text>
           <View style={styles.amountInputRow}>
-            <Text style={styles.currencyPrefix}>Rp</Text>
+            <Text style={[styles.currencyPrefix, { color: colors.primaryForeground }]}>Rp</Text>
             <TextInput
               accessibilityLabel="Nominal tagihan"
               value={amount}
               onChangeText={(value) => setAmount(value.replace(/[^\d]/g, ''))}
               keyboardType="number-pad"
               placeholder="0"
-              placeholderTextColor="rgba(255,255,255,0.55)"
+              placeholderTextColor={colors.primaryForeground}
               returnKeyType="next"
-              style={styles.amountInput}
+              style={[styles.amountInput, { color: colors.primaryForeground }]}
               maxLength={15}
               testID="bill-amount"
             />
           </View>
-          {amountValid ? <Text style={styles.amountFormatted}>{formatRupiah(amountValue)}</Text> : null}
+          {amountValid ? <Text style={[styles.amountFormatted, { color: colors.primaryForeground }]}>{formatRupiah(amountValue)}</Text> : null}
         </View>
 
         <View style={styles.fieldGroup}>
@@ -281,7 +283,7 @@ export default function BillFormScreen() {
           <View style={styles.reminderCopy}>
             <Text style={[styles.reminderTitle, { color: colors.foreground }]}>Ingatkan saya</Text>
             <Text style={[styles.reminderDescription, { color: colors.mutedForeground }]}>
-              Notifikasi lokal, sehari sebelum jatuh tempo.
+              H-1 pukul 09.00, atau pagi saat jatuh tempo.
             </Text>
           </View>
           <Switch
@@ -363,11 +365,11 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   formContent: { paddingHorizontal: 20, gap: 19 },
   amountCard: { borderRadius: 22, paddingHorizontal: 19, paddingTop: 18, paddingBottom: 17 },
-  amountLabel: { color: 'rgba(255,255,255,0.76)', fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 1 },
+  amountLabel: { opacity: 0.76, fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 1 },
   amountInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  currencyPrefix: { color: '#ffffff', fontFamily: 'Inter_600SemiBold', fontSize: 23, marginRight: 9 },
-  amountInput: { flex: 1, color: '#ffffff', padding: 0, fontFamily: 'Inter_700Bold', fontSize: 34, letterSpacing: -1.1 },
-  amountFormatted: { color: 'rgba(255,255,255,0.7)', marginTop: 3, fontFamily: 'Inter_500Medium', fontSize: 11 },
+  currencyPrefix: { fontFamily: 'Inter_600SemiBold', fontSize: 23, marginRight: 9 },
+  amountInput: { flex: 1, padding: 0, fontFamily: 'Inter_700Bold', fontSize: 34, letterSpacing: -1.1 },
+  amountFormatted: { opacity: 0.7, marginTop: 3, fontFamily: 'Inter_500Medium', fontSize: 11 },
   fieldGroup: { gap: 9 },
   label: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
