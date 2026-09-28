@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
@@ -13,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
+import { SurfaceBackground } from '@/components/SurfaceBackground';
 import { BILL_CATEGORIES, ensureReminderPermission, type BillCategory, useBills } from '@/contexts/BillsContext';
 import { useColors } from '@/hooks/useColors';
 import { formatDateInput, formatRupiah, getDaysUntilDue, getLocalDateString, isValidBillDate } from '@/lib/bill-format';
@@ -143,6 +145,7 @@ export default function BillFormScreen() {
         },
       ]}
     >
+      <SurfaceBackground />
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
@@ -172,7 +175,12 @@ export default function BillFormScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.amountCard, { backgroundColor: colors.primary }]}>
+        <LinearGradient
+          colors={[colors.primaryGlass, colors.primaryGlassDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.amountCard, { borderColor: colors.border }]}
+        >
           <Text style={[styles.amountLabel, { color: colors.primaryForeground }]}>NOMINAL TAGIHAN</Text>
           <View style={styles.amountInputRow}>
             <Text style={[styles.currencyPrefix, { color: colors.primaryForeground }]}>Rp</Text>
@@ -190,7 +198,7 @@ export default function BillFormScreen() {
             />
           </View>
           {amountValid ? <Text style={[styles.amountFormatted, { color: colors.primaryForeground }]}>{formatRupiah(amountValue)}</Text> : null}
-        </View>
+        </LinearGradient>
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.label, { color: colors.foreground }]}>Nama tagihan</Text>
@@ -358,13 +366,13 @@ export default function BillFormScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 17, gap: 13 },
-  backButton: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  backButton: { width: 40, height: 40, borderRadius: 7, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1 },
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, letterSpacing: -0.5 },
   headerSubtitle: { marginTop: 3, fontFamily: 'Inter_400Regular', fontSize: 12 },
   scroll: { flex: 1 },
   formContent: { paddingHorizontal: 20, gap: 19 },
-  amountCard: { borderRadius: 22, paddingHorizontal: 19, paddingTop: 18, paddingBottom: 17 },
+  amountCard: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 19, paddingTop: 18, paddingBottom: 17, overflow: 'hidden' },
   amountLabel: { opacity: 0.76, fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 1 },
   amountInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   currencyPrefix: { fontFamily: 'Inter_600SemiBold', fontSize: 23, marginRight: 9 },
@@ -374,25 +382,25 @@ const styles = StyleSheet.create({
   label: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   datePreview: { fontFamily: 'Inter_500Medium', fontSize: 11 },
-  inputShell: { minHeight: 49, borderRadius: 15, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 },
+  inputShell: { minHeight: 49, borderRadius: 7, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 },
   textInput: { flex: 1, paddingVertical: 11, fontFamily: 'Inter_400Regular', fontSize: 13 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  categoryOption: { minWidth: '30%', flexGrow: 1, flexBasis: '30%', minHeight: 43, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 8 },
+  categoryOption: { minWidth: '30%', flexGrow: 1, flexBasis: '30%', minHeight: 43, borderRadius: 7, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 8 },
   categoryText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   datePresets: { flexDirection: 'row', gap: 8 },
-  datePreset: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 7 },
+  datePreset: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 7 },
   datePresetText: { fontFamily: 'Inter_500Medium', fontSize: 10 },
-  reminderRow: { borderRadius: 17, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11 },
-  reminderIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  reminderRow: { borderRadius: 9, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  reminderIcon: { width: 36, height: 36, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   reminderCopy: { flex: 1, minWidth: 0 },
   reminderTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   reminderDescription: { fontFamily: 'Inter_400Regular', fontSize: 10, marginTop: 3 },
   platformNote: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17, marginTop: -11 },
-  noteShell: { minHeight: 84, borderRadius: 15, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
+  noteShell: { minHeight: 84, borderRadius: 7, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   noteInput: { flex: 1, minHeight: 60, padding: 0, fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19 },
-  errorBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 12 },
+  errorBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 7 },
   errorText: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 11, lineHeight: 16 },
-  saveButton: { height: 52, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 1 },
+  saveButton: { height: 52, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 1 },
   saveButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   pressed: { opacity: 0.8 },
 });

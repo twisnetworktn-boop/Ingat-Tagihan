@@ -1,59 +1,53 @@
-/**
- * Semantic design tokens for the mobile app.
- *
- * These tokens mirror the naming conventions used in web artifacts (index.css)
- * so that multi-artifact projects share a cohesive visual identity.
- *
- * Replace the placeholder values below with values that match the project's
- * brand. If a sibling web artifact exists, read its index.css and convert the
- * HSL values to hex so both artifacts use the same palette.
- *
- * To add dark mode, add a `dark` key with the same token names.
- * The useColors() hook will automatically pick it up.
- */
-
 const colors = {
   light: {
-    text: '#18332f',
-    tint: '#216358',
-    background: '#f5f7f4',
-    foreground: '#18332f',
-    card: '#ffffff',
-    cardForeground: '#18332f',
-    primary: '#216358',
+    text: '#27153b',
+    tint: '#6540ac',
+    background: '#f5f1fc',
+    backgroundEnd: '#e9e1f5',
+    glow: 'rgba(173, 126, 230, 0.27)',
+    foreground: '#27153b',
+    card: 'rgba(255, 255, 255, 0.74)',
+    cardForeground: '#27153b',
+    primary: '#6540ac',
     primaryForeground: '#ffffff',
-    secondary: '#e8efeb',
-    secondaryForeground: '#24564c',
-    muted: '#edf0ed',
-    mutedForeground: '#718079',
-    accent: '#fff0e9',
-    accentForeground: '#a84932',
-    destructive: '#bd4d45',
+    primaryGlass: 'rgba(91, 50, 162, 0.94)',
+    primaryGlassDeep: 'rgba(54, 28, 111, 0.89)',
+    secondary: 'rgba(151, 113, 205, 0.16)',
+    secondaryForeground: '#5d339e',
+    muted: 'rgba(119, 89, 164, 0.11)',
+    mutedForeground: '#695d7a',
+    accent: 'rgba(213, 187, 245, 0.34)',
+    accentForeground: '#58308c',
+    destructive: '#ad3963',
     destructiveForeground: '#ffffff',
-    border: '#e3e9e4',
-    input: '#e3e9e4',
+    border: 'rgba(96, 58, 150, 0.22)',
+    input: 'rgba(96, 58, 150, 0.22)',
   },
   dark: {
-    text: '#ecf3ee',
-    tint: '#9ed2c3',
-    background: '#101c19',
-    foreground: '#ecf3ee',
-    card: '#192823',
-    cardForeground: '#ecf3ee',
-    primary: '#2e7667',
+    text: '#f5effc',
+    tint: '#c7a5f2',
+    background: '#160f24',
+    backgroundEnd: '#241734',
+    glow: 'rgba(150, 96, 215, 0.23)',
+    foreground: '#f5effc',
+    card: 'rgba(48, 33, 69, 0.78)',
+    cardForeground: '#f5effc',
+    primary: '#6740a7',
     primaryForeground: '#ffffff',
-    secondary: '#243832',
-    secondaryForeground: '#c2e3d8',
-    muted: '#22312c',
-    mutedForeground: '#a2b2aa',
-    accent: '#40291f',
-    accentForeground: '#ffc2aa',
-    destructive: '#f07f75',
-    destructiveForeground: '#251311',
-    border: '#2c3e37',
-    input: '#2c3e37',
+    primaryGlass: 'rgba(103, 60, 171, 0.94)',
+    primaryGlassDeep: 'rgba(58, 31, 108, 0.9)',
+    secondary: 'rgba(161, 124, 216, 0.18)',
+    secondaryForeground: '#d9c2f4',
+    muted: 'rgba(171, 143, 210, 0.14)',
+    mutedForeground: '#c0b3ce',
+    accent: 'rgba(158, 107, 218, 0.22)',
+    accentForeground: '#e5c8fc',
+    destructive: '#ed84a7',
+    destructiveForeground: '#29131d',
+    border: 'rgba(203, 170, 238, 0.21)',
+    input: 'rgba(203, 170, 238, 0.21)',
   },
-  radius: 20,
+  radius: 8,
 };
 
 export default colors;

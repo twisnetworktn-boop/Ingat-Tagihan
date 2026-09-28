@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BILL_CATEGORIES, type Bill, useBills } from '@/contexts/BillsContext';
+import { SurfaceBackground } from '@/components/SurfaceBackground';
 import { useColors } from '@/hooks/useColors';
 import { formatDueLabel, formatRupiah, getDaysUntilDue, sortBills } from '@/lib/bill-format';
 
@@ -213,7 +215,12 @@ export default function HomeScreen() {
         Biar semua jatuh tempo tetap terpantau.
       </Text>
 
-      <View style={[styles.summaryCard, { backgroundColor: colors.primary }]}>
+      <LinearGradient
+        colors={[colors.primaryGlass, colors.primaryGlassDeep]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.summaryCard, { borderColor: colors.border }]}
+      >
         <View style={styles.summaryTop}>
           <View>
             <Text style={[styles.summaryEyebrow, { color: colors.primaryForeground }]}>TOTAL BELUM DIBAYAR</Text>
@@ -236,7 +243,7 @@ export default function HomeScreen() {
             <Text style={[styles.summaryFootText, { color: colors.primaryForeground }]}>{dueSoonCount} jatuh tempo dalam 7 hari</Text>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       <View style={styles.listHeading}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Daftar tagihan</Text>
@@ -337,6 +344,7 @@ export default function HomeScreen() {
         },
       ]}
     >
+      <SurfaceBackground />
       <FlatList
         data={visibleBills}
         keyExtractor={(item) => item.id}
@@ -387,17 +395,17 @@ const styles = StyleSheet.create({
   headerContent: { paddingBottom: 21 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  brandMark: { width: 22, height: 22, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  brandMark: { width: 22, height: 22, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   brandName: { fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: -0.7 },
   dateLabel: { marginTop: 5, fontFamily: 'Inter_500Medium', fontSize: 11, textTransform: 'capitalize' },
-  headerAddButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  headerAddButton: { width: 42, height: 42, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   pageTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, letterSpacing: -1.1 },
   pageSubtitle: { marginTop: 6, fontFamily: 'Inter_400Regular', fontSize: 14 },
-  summaryCard: { marginTop: 22, borderRadius: 23, paddingHorizontal: 20, paddingVertical: 19 },
+  summaryCard: { marginTop: 22, borderRadius: 10, borderWidth: 1, paddingHorizontal: 20, paddingVertical: 19, overflow: 'hidden' },
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summaryEyebrow: { opacity: 0.75, fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 1.1 },
   summaryAmount: { marginTop: 8, fontSize: 27, fontFamily: 'Inter_700Bold', letterSpacing: -0.8 },
-  summaryIcon: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, opacity: 0.75, alignItems: 'center', justifyContent: 'center' },
+  summaryIcon: { width: 40, height: 40, borderRadius: 7, borderWidth: 1, opacity: 0.75, alignItems: 'center', justifyContent: 'center' },
   summaryDivider: { height: StyleSheet.hairlineWidth, opacity: 0.24, marginTop: 17, marginBottom: 13 },
   summaryFoot: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   summaryStat: { flexDirection: 'row', alignItems: 'center', gap: 7 },
@@ -405,14 +413,14 @@ const styles = StyleSheet.create({
   listHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 28 },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: -0.4 },
   billCount: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  errorBanner: { borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  errorBanner: { borderRadius: 7, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   errorBannerText: { flex: 1, fontSize: 11, fontFamily: 'Inter_500Medium' },
   filters: { flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 15 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 13, borderWidth: 1 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 6, borderWidth: 1 },
   filterText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  billCard: { borderRadius: 19, borderWidth: 1, padding: 15 },
+  billCard: { borderRadius: 9, borderWidth: 1, padding: 15 },
   billTop: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  categoryIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  categoryIcon: { width: 42, height: 42, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   billMain: { flex: 1, minWidth: 0 },
   billTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   billCategory: { marginTop: 3, fontFamily: 'Inter_400Regular', fontSize: 11 },
@@ -422,19 +430,19 @@ const styles = StyleSheet.create({
   billBottom: { flexDirection: 'row', alignItems: 'center', minHeight: 26 },
   dueTextWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   dueText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
-  reminderTag: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, marginLeft: 8 },
+  reminderTag: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 4, paddingHorizontal: 7, paddingVertical: 5, marginLeft: 8 },
   reminderTagText: { fontSize: 9, fontFamily: 'Inter_600SemiBold' },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 11, marginLeft: 'auto', paddingLeft: 8 },
-  statusButton: { width: 23, height: 23, borderRadius: 9, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  statusButton: { width: 23, height: 23, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   iconButton: { width: 27, height: 27, alignItems: 'center', justifyContent: 'center' },
   cardSpacer: { height: 10 },
-  emptyCard: { borderRadius: 20, borderWidth: 1, padding: 23, alignItems: 'center', marginTop: 5 },
-  emptyIcon: { width: 54, height: 54, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  emptyCard: { borderRadius: 9, borderWidth: 1, padding: 23, alignItems: 'center', marginTop: 5 },
+  emptyIcon: { width: 54, height: 54, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontFamily: 'Inter_700Bold', fontSize: 16, textAlign: 'center', marginTop: 15 },
   emptyCopy: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 7, maxWidth: 280 },
-  emptyAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 13, paddingHorizontal: 16, paddingVertical: 12, marginTop: 18 },
+  emptyAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 7, paddingHorizontal: 16, paddingVertical: 12, marginTop: 18 },
   emptyActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  floatingButton: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 19, height: 52, borderRadius: 18, elevation: 5, shadowOpacity: 0.16, shadowOffset: { width: 0, height: 5 }, shadowRadius: 12 },
+  floatingButton: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 19, height: 52, borderRadius: 8, elevation: 5, shadowOpacity: 0.16, shadowOffset: { width: 0, height: 5 }, shadowRadius: 12 },
   floatingButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   pressed: { opacity: 0.78 },
 });
