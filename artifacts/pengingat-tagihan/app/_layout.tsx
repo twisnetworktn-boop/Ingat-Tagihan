@@ -5,6 +5,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { NotificationTapHandler } from '@/components/NotificationTapHandler';
 import { BillsProvider } from '@/contexts/BillsContext';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { useColors } from '@/hooks/useColors';
@@ -73,6 +74,7 @@ export default function RootLayout() {
                 <NotesProvider>
                   <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
                   <RootLayoutNav />
+                  <NotificationTapHandler />
                 </NotesProvider>
               </BillsProvider>
             </KeyboardProvider>

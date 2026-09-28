@@ -30,6 +30,7 @@ Aplikasi mobile offline untuk mencatat berbagai tagihan, memantau jatuh tempo, d
 - Confirming payment keeps the paid bill as history and creates the next monthly bill. The original due-day anchors months shorter than that day; deleting an active bill stops its series without removing older paid history.
 - Bills can instead be marked once-only: their reminder fires once and confirming payment preserves the log without creating another bill. Older saved bills remain monthly by default.
 - The offline Catatan menu tracks debts in either direction, deposits against debts, and weekly/monthly routine expenses. Routine payments keep history and advance the next due date; optional local reminders are scheduled once per due date.
+- Tapping a local reminder opens its saved bill, debt, or routine expense, including when the app was closed; if the record no longer exists, the app opens the appropriate list instead.
 
 ## Product
 
