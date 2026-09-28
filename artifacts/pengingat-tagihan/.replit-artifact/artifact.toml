@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "Ingat Tagihan"
+description = "Aplikasi mobile offline untuk mencatat tagihan, memantau jatuh tempo, menandai pembayaran, dan mengatur pengingat lokal di perangkat."
+version = "1.0.0"
+id = "artifacts/pengingat-tagihan"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 25938
+
+[services.development]
+run = "pnpm --filter @workspace/pengingat-tagihan run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pengingat-tagihan", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/pengingat-tagihan", "run", "serve" ]
+
+[services.env]
+PORT = "25938"
+BASE_PATH = "/"
