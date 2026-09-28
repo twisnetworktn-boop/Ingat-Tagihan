@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -234,6 +234,11 @@ export default function HomeScreen() {
         Biar semua jatuh tempo tetap terpantau.
       </Text>
       <TopMenu active="bills" />
+      {__DEV__ && Platform.OS !== 'web' && (
+        <Pressable accessibilityRole="button" onPress={() => router.push('/notification-check' as Href)}>
+          <Text style={{ color: colors.mutedForeground }}>Uji notifikasi perangkat</Text>
+        </Pressable>
+      )}
 
       <LinearGradient
         colors={[colors.dashboardGlass, colors.dashboardGlassDeep]}
