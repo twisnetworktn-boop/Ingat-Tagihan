@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BILL_CATEGORIES, type Bill, useBills } from '@/contexts/BillsContext';
 import { SurfaceBackground } from '@/components/SurfaceBackground';
+import { TopMenu } from '@/components/TopMenu';
 import { useColors } from '@/hooks/useColors';
 import { formatDateInput, formatDueLabel, formatRupiah, formatShortDate, getDaysUntilDue, getNextMonthlyDueDate, sortBills } from '@/lib/bill-format';
 
@@ -57,7 +58,7 @@ function BillCard({
               {bill.title}
             </Text>
             <Text numberOfLines={1} style={[styles.billCategory, { color: colors.mutedForeground }]}>
-              {bill.isPaid ? `${category.label} · Jatuh tempo ${formatShortDate(bill.dueDate)}` : category.label}
+            {bill.isPaid ? `${category.label} · Jatuh tempo ${formatShortDate(bill.dueDate)}` : `${category.label} · ${bill.repeat === 'once' ? 'Sekali bayar' : 'Bulanan'}`}
             </Text>
           </View>
           <Text style={[styles.amount, { color: colors.foreground }, bill.isPaid && styles.paidText]}>
@@ -174,7 +175,9 @@ export default function HomeScreen() {
 
   const changePaid = (bill: Bill) => {
     const nextDate = getNextMonthlyDueDate(bill.dueDate, bill.recurrenceDay ?? Number(bill.dueDate.slice(-2)));
-    const message = `${bill.title} akan disimpan di riwayat lunas. Tagihan berikutnya otomatis dibuat untuk ${formatDateInput(nextDate)}.`;
+    const message = bill.repeat === 'once'
+      ? `${bill.title} akan disimpan di riwayat lunas. Tagihan ini tidak akan berulang.`
+      : `${bill.title} akan disimpan di riwayat lunas. Tagihan berikutnya otomatis dibuat untuk ${formatDateInput(nextDate)}.`;
     const confirmPayment = () => {
       void markPaid(bill.id).catch((cause: unknown) => {
         const errorMessage = cause instanceof Error ? cause.message : 'Pembayaran belum bisa disimpan.';
@@ -230,6 +233,7 @@ export default function HomeScreen() {
       <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
         Biar semua jatuh tempo tetap terpantau.
       </Text>
+      <TopMenu active="bills" />
 
       <LinearGradient
         colors={[colors.primaryGlass, colors.primaryGlassDeep]}
@@ -418,7 +422,7 @@ const styles = StyleSheet.create({
   dateLabel: { marginTop: 5, fontFamily: 'Inter_500Medium', fontSize: 11, textTransform: 'capitalize' },
   headerAddButton: { width: 42, height: 42, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   pageTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, letterSpacing: -1.1 },
-  pageSubtitle: { marginTop: 6, fontFamily: 'Inter_400Regular', fontSize: 14 },
+  pageSubtitle: { marginTop: 6, marginBottom: 21, fontFamily: 'Inter_400Regular', fontSize: 14 },
   summaryCard: { marginTop: 22, borderRadius: 10, borderWidth: 1, paddingHorizontal: 20, paddingVertical: 19, overflow: 'hidden' },
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summaryEyebrow: { opacity: 0.75, fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 1.1 },

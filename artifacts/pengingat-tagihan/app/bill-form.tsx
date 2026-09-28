@@ -39,6 +39,7 @@ export default function BillFormScreen() {
   const [category, setCategory] = useState<BillCategory>(existing?.category ?? 'electricity');
   const [note, setNote] = useState(existing?.note ?? '');
   const [remind, setRemind] = useState(existing?.remind ?? false);
+  const [repeat, setRepeat] = useState<'monthly' | 'once'>(existing?.repeat ?? 'monthly');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -124,6 +125,7 @@ export default function BillFormScreen() {
         dueDate,
         category,
         note: note.trim(),
+        repeat,
         remind,
       });
       router.back();
@@ -281,12 +283,38 @@ export default function BillFormScreen() {
               testID="bill-due-date"
             />
           </View>
-          <Text style={[styles.recurrenceNote, { color: colors.mutedForeground }]}>
-            {existing?.isPaid
-              ? 'Ini riwayat lunas. Tagihan aktif bulan berikutnya tersimpan terpisah.'
-              : 'Berulang setiap bulan setelah dikonfirmasi lunas, sampai tagihan aktif dihapus.'}
-          </Text>
         </View>
+
+        {!existing?.isPaid ? (
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.label, { color: colors.foreground }]}>Jenis tagihan</Text>
+            <View style={styles.datePresets}>
+              {([
+                ['monthly', 'Bulanan'],
+                ['once', 'Sekali bayar'],
+              ] as const).map(([value, label]) => (
+                <Pressable
+                  key={value}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: repeat === value }}
+                  onPress={() => setRepeat(value)}
+                  style={[styles.datePreset, { backgroundColor: repeat === value ? colors.actionSoft : colors.card, borderColor: repeat === value ? colors.action : colors.border }]}
+                >
+                  <Text style={[styles.categoryText, { color: repeat === value ? colors.action : colors.mutedForeground }]}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={[styles.recurrenceNote, { color: colors.mutedForeground }]}>
+              {repeat === 'monthly'
+                ? 'Berulang tiap bulan setelah dikonfirmasi lunas, sesuai tanggal jatuh tempo yang diinput.'
+                : 'Hanya sekali. Pengingat akan berbunyi satu kali menjelang jatuh tempo jika diaktifkan.'}
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.recurrenceNote, { color: colors.mutedForeground }]}>
+            Ini riwayat lunas. Tagihan aktif berikutnya, jika ada, tersimpan terpisah.
+          </Text>
+        )}
 
         {!existing?.isPaid ? (
           <View style={[styles.reminderRow, { backgroundColor: colors.card, borderColor: colors.border }]}>

@@ -1,0 +1,410 @@
+import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SurfaceBackground } from '@/components/SurfaceBackground';
+import { TopMenu } from '@/components/TopMenu';
+import { useNotes, type Debt, type Deposit, type Routine, type RoutinePayment } from '@/contexts/NotesContext';
+import { useColors } from '@/hooks/useColors';
+import { formatDateInput, formatRupiah, getLocalDateString, getNextMonthlyDueDate } from '@/lib/bill-format';
+
+type Section = 'debt' | 'deposit' | 'routine';
+type Palette = ReturnType<typeof useColors>;
+
+function confirmAction(title: string, message: string, action: string, destructive: boolean, onConfirm: () => void) {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+  } else {
+    Alert.alert(title, message, [
+      { text: 'Batal', style: 'cancel' },
+      { text: action, style: destructive ? 'destructive' : 'default', onPress: onConfirm },
+    ]);
+  }
+}
+
+function showError(error: unknown) {
+  const message = error instanceof Error ? error.message : 'Perubahan belum bisa disimpan. Coba lagi.';
+  if (Platform.OS === 'web') window.alert(message);
+  else Alert.alert('Belum berhasil', message);
+}
+
+function SmallAction({ icon, label, onPress, colors, danger = false }: {
+  icon: React.ComponentProps<typeof Feather>['name']; label: string; onPress: () => void; colors: Palette; danger?: boolean;
+}) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={5}
+      style={({ pressed }) => [styles.smallAction, { backgroundColor: danger ? colors.accent : colors.actionSoft }, pressed && styles.pressed]}>
+      <Feather name={icon} size={14} color={danger ? colors.destructive : colors.action} />
+    </Pressable>
+  );
+}
+
+function DebtCard({ debt, deposits, colors, onEdit, onDelete, onAddDeposit, onEditDeposit, onDeleteDeposit }: {
+  debt: Debt; deposits: Deposit[]; colors: Palette; onEdit: () => void; onDelete: () => void; onAddDeposit: () => void;
+  onEditDeposit: (deposit: Deposit) => void; onDeleteDeposit: (deposit: Deposit) => void;
+}) {
+  const paid = deposits.reduce((total, deposit) => total + deposit.amount, 0);
+  const remaining = Math.max(0, debt.amount - paid);
+  const settled = remaining === 0;
+  const progress = debt.amount > 0 ? Math.min(100, paid / debt.amount * 100) : 0;
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.cardTop}>
+        <View style={[styles.cardIcon, { backgroundColor: settled ? colors.actionSoft : colors.secondary }]}>
+          <Feather name={settled ? 'check' : debt.direction === 'owe' ? 'arrow-up-right' : 'arrow-down-left'} size={19} color={settled ? colors.action : colors.primary} />
+        </View>
+        <View style={styles.cardMain}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{debt.person}</Text>
+          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{debt.direction === 'owe' ? 'Saya berutang' : 'Mereka berutang'} · {settled ? 'Lunas' : `Jatuh tempo ${formatDateInput(debt.dueDate)}`}</Text>
+        </View>
+        <SmallAction icon="edit-2" label={`Ubah utang ${debt.person}`} onPress={onEdit} colors={colors} />
+        <SmallAction icon="trash-2" label={`Hapus utang ${debt.person}`} onPress={onDelete} colors={colors} danger />
+      </View>
+      <View style={styles.balanceRow}>
+        <View>
+          <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>{settled ? 'TERBAYAR PENUH' : 'SISA SALDO'}</Text>
+          <Text style={[styles.balance, { color: settled ? colors.action : colors.foreground }]}>{formatRupiah(settled ? debt.amount : remaining)}</Text>
+        </View>
+        <Text style={[styles.total, { color: colors.mutedForeground }]}>dari {formatRupiah(debt.amount)}</Text>
+      </View>
+      <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
+        <View style={[styles.progressFill, { backgroundColor: colors.action, width: `${progress}%` }]} />
+      </View>
+      {debt.note ? <Text style={[styles.note, { color: colors.mutedForeground }]}>{debt.note}</Text> : null}
+      <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />
+      <View style={styles.depositHeading}>
+        <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Setoran <Text style={{ color: colors.mutedForeground }}>({deposits.length})</Text></Text>
+        {!settled && (
+          <Pressable accessibilityRole="button" onPress={onAddDeposit} style={styles.inlineAdd}>
+            <Feather name="plus" size={15} color={colors.action} />
+            <Text style={[styles.inlineAddText, { color: colors.action }]}>Catat setoran</Text>
+          </Pressable>
+        )}
+      </View>
+      {deposits.length === 0 ? (
+        <Text style={[styles.depositEmpty, { color: colors.mutedForeground }]}>Belum ada setoran. Saldo akan berkurang saat kamu mencatatnya.</Text>
+      ) : [...deposits].sort((a, b) => b.date.localeCompare(a.date)).map(deposit => (
+        <View key={deposit.id} style={[styles.depositLine, { borderTopColor: colors.border }]}>
+          <View style={[styles.depositDot, { backgroundColor: colors.actionSoft }]}><Feather name="arrow-down-left" size={13} color={colors.action} /></View>
+          <View style={styles.depositCopy}>
+            <Text style={[styles.depositAmount, { color: colors.foreground }]}>{formatRupiah(deposit.amount)}</Text>
+            <Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>{formatDateInput(deposit.date)}{deposit.note ? ` · ${deposit.note}` : ''}</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Ubah setoran ${formatRupiah(deposit.amount)}`} onPress={() => onEditDeposit(deposit)} hitSlop={8} style={styles.rowIcon}><Feather name="edit-2" size={14} color={colors.mutedForeground} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Hapus setoran ${formatRupiah(deposit.amount)}`} onPress={() => onDeleteDeposit(deposit)} hitSlop={8} style={styles.rowIcon}><Feather name="trash-2" size={14} color={colors.destructive} /></Pressable>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function RoutineCard({ routine, payments, colors, onEdit, onDelete, onPay }: {
+  routine: Routine; payments: RoutinePayment[]; colors: Palette; onEdit: () => void; onDelete: () => void; onPay: () => void;
+}) {
+  const due = routine.dueDate < getLocalDateString(new Date()) ? 'Lewat jatuh tempo' : `Berikutnya ${formatDateInput(routine.dueDate)}`;
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.cardTop}>
+        <View style={[styles.cardIcon, { backgroundColor: colors.secondary }]}><Feather name="repeat" size={18} color={colors.primary} /></View>
+        <View style={styles.cardMain}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{routine.title}</Text>
+          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Setiap {routine.frequency === 'weekly' ? 'minggu' : 'bulan'}</Text>
+        </View>
+        <SmallAction icon="edit-2" label={`Ubah ${routine.title}`} onPress={onEdit} colors={colors} />
+        <SmallAction icon="trash-2" label={`Hapus ${routine.title}`} onPress={onDelete} colors={colors} danger />
+      </View>
+      <View style={styles.balanceRow}>
+        <View>
+          <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>PER PERIODE</Text>
+          <Text style={[styles.balance, { color: colors.foreground }]}>{formatRupiah(routine.amount)}</Text>
+        </View>
+        {routine.remind && <Feather name="bell" size={15} color={colors.primary} />}
+      </View>
+      <View style={styles.dueRow}><Feather name="calendar" size={13} color={colors.primary} /><Text style={[styles.dueText, { color: colors.primary }]}>{due}</Text></View>
+      {routine.note ? <Text style={[styles.note, { color: colors.mutedForeground }]}>{routine.note}</Text> : null}
+      <Pressable accessibilityRole="button" onPress={onPay} style={({ pressed }) => [styles.payButton, { backgroundColor: colors.action }, pressed && styles.pressed]}>
+        <Feather name="check" size={16} color={colors.actionForeground} />
+        <Text style={[styles.payText, { color: colors.actionForeground }]}>Sudah dibayar</Text>
+      </Pressable>
+      <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />
+      <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pembayaran <Text style={{ color: colors.mutedForeground }}>({payments.length})</Text></Text>
+      {payments.length === 0 ? (
+        <Text style={[styles.depositEmpty, { color: colors.mutedForeground }]}>Belum ada pembayaran. Konfirmasi setelah pengeluaran ini dibayar.</Text>
+      ) : [...payments].sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
+        <View key={payment.id} style={[styles.depositLine, { borderTopColor: colors.border }]}>
+          <View style={[styles.depositDot, { backgroundColor: colors.actionSoft }]}><Feather name="check" size={13} color={colors.action} /></View>
+          <View style={styles.depositCopy}>
+            <Text style={[styles.depositAmount, { color: colors.foreground }]}>{formatRupiah(payment.amount)}</Text>
+            <Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {payment.paidAt.slice(0, 10)}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export default function CatatanScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { debts, deposits, routines, routinePayments, loading, error, reload, deleteDebt, deleteDeposit, deleteRoutine, payRoutine } = useNotes();
+  const [section, setSection] = useState<Section>('debt');
+  const [refreshing, setRefreshing] = useState(false);
+  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
+
+  const groups = useMemo(() => ({
+    owe: debts.filter(x => x.direction === 'owe').sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+    owed: debts.filter(x => x.direction === 'owed').sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+  }), [debts]);
+  const balance = (debt: Debt) => Math.max(0, debt.amount - deposits.filter(x => x.debtId === debt.id).reduce((sum, x) => sum + x.amount, 0));
+  const oweTotal = groups.owe.reduce((sum, debt) => sum + balance(debt), 0);
+  const owedTotal = groups.owed.reduce((sum, debt) => sum + balance(debt), 0);
+  const openCount = debts.filter(x => balance(x) > 0).length;
+  const openDebts = debts.filter(x => balance(x) > 0);
+  const action = (task: () => Promise<void>) => { void task().catch(showError); };
+  const removeDebt = (debt: Debt) => confirmAction('Hapus catatan utang?', `${debt.person} dan semua setoran yang terkait akan dihapus permanen.`, 'Hapus utang', true, () => action(() => deleteDebt(debt.id)));
+  const removeDeposit = (deposit: Deposit) => confirmAction('Hapus setoran?', `${formatRupiah(deposit.amount)} akan dihapus dan saldo utang kembali bertambah.`, 'Hapus setoran', true, () => action(() => deleteDeposit(deposit.id)));
+  const removeRoutine = (routine: Routine) => confirmAction('Hapus pengeluaran rutin?', `${routine.title} tidak akan berulang lagi. Riwayat pembayaran sebelumnya tetap tersimpan.`, 'Hapus rutin', true, () => action(() => deleteRoutine(routine.id)));
+  const markRoutine = (routine: Routine) => {
+    let nextDate: string;
+    if (routine.frequency === 'weekly') {
+      const [year, month, day] = routine.dueDate.split('-').map(Number);
+      const next = new Date(year, month - 1, day);
+      next.setDate(next.getDate() + 7);
+      nextDate = getLocalDateString(next);
+    } else nextDate = getNextMonthlyDueDate(routine.dueDate, routine.anchorDay);
+    confirmAction('Sudah dibayar?', `${formatRupiah(routine.amount)} untuk ${routine.title} akan masuk riwayat. Jatuh tempo berikutnya ${formatDateInput(nextDate)}.`, 'Sudah dibayar', false, () => action(() => payRoutine(routine.id)));
+  };
+  const navigate = (type: 'debt' | 'deposit' | 'routine', id?: string, debtId?: string) => router.push({ pathname: '/catatan-form', params: { type, ...(id ? { id } : {}), ...(debtId ? { debtId } : {}) } });
+  const refresh = async () => { setRefreshing(true); try { await reload(); } catch (cause) { showError(cause); } finally { setRefreshing(false); } };
+  const empty = section === 'debt' ? debts.length === 0 : section === 'deposit' ? deposits.length === 0 : routines.length === 0;
+
+  const renderGroup = (title: string, subtitle: string, list: Debt[]) => (
+    <View style={styles.group}>
+      <View style={styles.groupHeading}>
+        <View><Text style={[styles.groupTitle, { color: colors.foreground }]}>{title}</Text><Text style={[styles.groupSub, { color: colors.mutedForeground }]}>{subtitle}</Text></View>
+        <Text style={[styles.groupCount, { color: colors.primary }]}>{list.length}</Text>
+      </View>
+      {list.length === 0 ? (
+        <View style={[styles.quietRow, { borderColor: colors.border, backgroundColor: colors.card }]}><Text style={[styles.quietText, { color: colors.mutedForeground }]}>Belum ada catatan di bagian ini.</Text></View>
+      ) : list.map(debt => (
+        <DebtCard key={debt.id} debt={debt} deposits={deposits.filter(x => x.debtId === debt.id)} colors={colors}
+          onEdit={() => navigate('debt', debt.id)} onDelete={() => removeDebt(debt)} onAddDeposit={() => navigate('deposit', undefined, debt.id)}
+          onEditDeposit={deposit => navigate('deposit', deposit.id)} onDeleteDeposit={removeDeposit} />
+      ))}
+    </View>
+  );
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: Platform.OS === 'web' ? insets.top + 67 : insets.top }]}>
+      <SurfaceBackground />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />}
+        contentContainerStyle={[styles.content, { paddingBottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 95 }]}
+      >
+        <View style={styles.brandRow}>
+          <View style={[styles.brandMark, { backgroundColor: colors.primary }]}><Feather name="check" size={14} color={colors.primaryForeground} /></View>
+          <Text style={[styles.brand, { color: colors.foreground }]}>ingat</Text>
+          <Text style={[styles.privateLabel, { color: colors.mutedForeground }]}>RUANG PRIBADI</Text>
+        </View>
+        <Text style={[styles.title, { color: colors.foreground }]}>Catatan kamu</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Utang dan pengeluaran rutin, tersimpan rapi di sini.</Text>
+        <TopMenu active="notes" />
+
+        <LinearGradient colors={[colors.primaryGlass, colors.primaryGlassDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.summary, { borderColor: colors.border }]}>
+          <View style={styles.summaryHeader}><Text style={[styles.summaryEyebrow, { color: colors.primaryForeground }]}>SEKILAS CATATAN</Text><Feather name="book-open" size={20} color={colors.primaryForeground} /></View>
+          <View style={styles.summaryColumns}>
+            <View style={styles.summaryColumn}><Text style={[styles.summaryLabel, { color: colors.primaryForeground }]}>Perlu kubayar</Text><Text numberOfLines={1} adjustsFontSizeToFit style={[styles.summaryNumber, { color: colors.primaryForeground }]}>{formatRupiah(oweTotal)}</Text></View>
+            <View style={[styles.summaryLine, { backgroundColor: colors.primaryForeground }]} />
+            <View style={styles.summaryColumn}><Text style={[styles.summaryLabel, { color: colors.primaryForeground }]}>Perlu kuterima</Text><Text numberOfLines={1} adjustsFontSizeToFit style={[styles.summaryNumber, { color: colors.primaryForeground }]}>{formatRupiah(owedTotal)}</Text></View>
+          </View>
+          <Text style={[styles.summaryFoot, { color: colors.primaryForeground }]}>{openCount} utang berjalan · {routines.length} pengeluaran rutin</Text>
+        </LinearGradient>
+
+        <View style={styles.sectionTabs}>
+          {([['debt', 'Hutang', 'users'], ['deposit', 'Setoran', 'credit-card'], ['routine', 'Biaya rutin', 'repeat']] as const).map(([key, label, icon]) => (
+            <Pressable key={key} accessibilityRole="tab" accessibilityState={{ selected: section === key }} onPress={() => setSection(key)}
+              style={[styles.sectionTab, { backgroundColor: section === key ? colors.action : colors.card, borderColor: section === key ? colors.action : colors.border }]}>
+              <Feather name={icon} size={14} color={section === key ? colors.actionForeground : colors.mutedForeground} />
+              <Text numberOfLines={1} style={[styles.sectionTabText, { color: section === key ? colors.actionForeground : colors.mutedForeground }]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {error && (
+          <View style={[styles.error, { backgroundColor: colors.accent }]}>
+            <Feather name="alert-circle" size={16} color={colors.accentForeground} />
+            <Text style={[styles.errorText, { color: colors.accentForeground }]}>{error}</Text>
+            <Pressable onPress={() => void reload()} accessibilityRole="button"><Text style={[styles.retry, { color: colors.accentForeground }]}>Coba lagi</Text></Pressable>
+          </View>
+        )}
+        {loading && debts.length === 0 && deposits.length === 0 && routines.length === 0 ? (
+          <View style={styles.skeletons}>
+            <View style={[styles.skeletonTitle, { backgroundColor: colors.secondary }]} />
+            <View style={[styles.skeletonCard, { backgroundColor: colors.secondary }]} />
+            <View style={[styles.skeletonCard, { backgroundColor: colors.secondary }]} />
+          </View>
+        ) : error && debts.length === 0 && deposits.length === 0 && routines.length === 0 ? (
+          <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="alert-circle" size={25} color={colors.destructive} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Catatan belum bisa dibuka</Text>
+            <Pressable onPress={() => void reload()} style={[styles.emptyButton, { backgroundColor: colors.action }]}><Text style={[styles.emptyButtonText, { color: colors.actionForeground }]}>Coba lagi</Text></Pressable>
+          </View>
+        ) : empty ? (
+          <>
+            <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}><Feather name={section === 'debt' ? 'book-open' : section === 'deposit' ? 'credit-card' : 'repeat'} size={25} color={colors.primary} /></View>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{section === 'debt' ? 'Mulai dari satu catatan' : section === 'deposit' ? 'Belum ada setoran' : 'Belum ada pengeluaran rutin'}</Text>
+              <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>{section === 'debt' ? 'Catat siapa dan berapa, lalu kurangi saldonya setiap kali ada setoran.' : section === 'deposit' ? openDebts.length > 0 ? 'Setoran yang kamu catat untuk utang dan piutang akan tersimpan di sini.' : 'Untuk mencatat setoran, buat dulu catatan hutang yang masih memiliki sisa saldo.' : 'Catat pengeluaran yang kembali tiap minggu atau bulan. Riwayat bayar akan tersimpan.'}</Text>
+              <Pressable onPress={() => navigate(section === 'deposit' && openDebts.length === 0 ? 'debt' : section)} style={[styles.emptyButton, { backgroundColor: colors.action }]}>
+                <Feather name="plus" size={16} color={colors.actionForeground} /><Text style={[styles.emptyButtonText, { color: colors.actionForeground }]}>Tambah {section === 'debt' ? 'hutang' : section === 'deposit' ? openDebts.length > 0 ? 'setoran' : 'hutang dulu' : 'pengeluaran'}</Text>
+              </Pressable>
+            </View>
+            {section === 'routine' && routinePayments.length > 0 && (
+              <View style={[styles.archive, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 18 }]}>
+                <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pembayaran tersimpan</Text>
+                {[...routinePayments].sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
+                  <View key={payment.id} style={[styles.depositLine, { borderTopColor: colors.border }]}>
+                    <View style={styles.depositCopy}><Text style={[styles.depositAmount, { color: colors.foreground }]}>{payment.title} · {formatRupiah(payment.amount)}</Text><Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {payment.paidAt.slice(0, 10)}</Text></View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        ) : section === 'debt' ? (
+          <>
+            {renderGroup('Saya berutang', 'Yang perlu kubayar', groups.owe)}
+            {renderGroup('Mereka berutang', 'Yang perlu kuterima', groups.owed)}
+            {openDebts.length > 0 && (
+              <Pressable onPress={() => navigate('deposit')} style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <Feather name="plus" size={16} color={colors.action} /><Text style={[styles.secondaryActionText, { color: colors.action }]}>Catat setoran untuk utang</Text>
+              </Pressable>
+            )}
+          </>
+        ) : section === 'deposit' ? (
+          <View style={styles.group}>
+            <View style={styles.groupHeading}>
+              <View>
+                <Text style={[styles.groupTitle, { color: colors.foreground }]}>Semua setoran</Text>
+                <Text style={[styles.groupSub, { color: colors.mutedForeground }]}>Pembayaran utang dan piutang yang sudah dicatat</Text>
+              </View>
+              <Text style={[styles.groupCount, { color: colors.primary }]}>{deposits.length}</Text>
+            </View>
+            {openDebts.length === 0 && (
+              <View style={[styles.depositNotice, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <Feather name="info" size={17} color={colors.primary} />
+                <View style={styles.depositNoticeCopy}>
+                  <Text style={[styles.depositNoticeTitle, { color: colors.foreground }]}>Belum ada hutang dengan sisa saldo</Text>
+                  <Text style={[styles.depositNoticeBody, { color: colors.mutedForeground }]}>Setoran baru memerlukan hutang yang belum lunas. Catatan lama tetap bisa kamu lihat di bawah.</Text>
+                  <Pressable accessibilityRole="button" onPress={() => navigate('debt')} style={styles.noticeLink}>
+                    <Text style={[styles.inlineAddText, { color: colors.action }]}>Buat catatan hutang</Text>
+                    <Feather name="arrow-right" size={14} color={colors.action} />
+                  </Pressable>
+                </View>
+              </View>
+            )}
+            {[...deposits].sort((a, b) => b.date.localeCompare(a.date)).map(deposit => {
+              const debt = debts.find(x => x.id === deposit.debtId);
+              return (
+                <View key={deposit.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.cardTop}>
+                    <View style={[styles.cardIcon, { backgroundColor: colors.actionSoft }]}><Feather name="arrow-down-left" size={18} color={colors.action} /></View>
+                    <View style={styles.cardMain}>
+                      <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{debt?.person ?? 'Catatan hutang tidak tersedia'}</Text>
+                      <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{debt ? debt.direction === 'owe' ? 'Saya berutang' : 'Mereka berutang' : 'Setoran tersimpan tanpa catatan induk'}</Text>
+                    </View>
+                    {debt && <SmallAction icon="edit-2" label={`Ubah setoran ${formatRupiah(deposit.amount)}`} onPress={() => navigate('deposit', deposit.id)} colors={colors} />}
+                    <SmallAction icon="trash-2" label={`Hapus setoran ${formatRupiah(deposit.amount)}`} onPress={() => removeDeposit(deposit)} colors={colors} danger />
+                  </View>
+                  <View style={styles.balanceRow}>
+                    <View>
+                      <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>JUMLAH SETORAN</Text>
+                      <Text style={[styles.balance, { color: colors.foreground }]}>{formatRupiah(deposit.amount)}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.dueRow}><Feather name="calendar" size={13} color={colors.primary} /><Text style={[styles.dueText, { color: colors.primary }]}>{formatDateInput(deposit.date) || deposit.date}</Text></View>
+                  {deposit.note ? <Text style={[styles.note, { color: colors.mutedForeground }]}>{deposit.note}</Text> : null}
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.group}>
+            <View style={styles.groupHeading}><View><Text style={[styles.groupTitle, { color: colors.foreground }]}>Siklus berjalan</Text><Text style={[styles.groupSub, { color: colors.mutedForeground }]}>Konfirmasi saat sudah dibayar</Text></View><Text style={[styles.groupCount, { color: colors.primary }]}>{routines.length}</Text></View>
+            {[...routines].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).map(routine => (
+              <RoutineCard key={routine.id} routine={routine} payments={routinePayments.filter(x => x.routineId === routine.id)} colors={colors}
+                onEdit={() => navigate('routine', routine.id)} onDelete={() => removeRoutine(routine)} onPay={() => markRoutine(routine)} />
+            ))}
+            {routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)).length > 0 && (
+              <View style={[styles.archive, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat dari rutin yang dihapus</Text>
+                {routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)).sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
+                  <View key={payment.id} style={[styles.depositLine, { borderTopColor: colors.border }]}>
+                    <View style={styles.depositCopy}><Text style={[styles.depositAmount, { color: colors.foreground }]}>{payment.title} · {formatRupiah(payment.amount)}</Text><Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {payment.paidAt.slice(0, 10)}</Text></View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+      </ScrollView>
+      {!loading && !(error && debts.length === 0 && deposits.length === 0 && routines.length === 0) && !empty && (section !== 'deposit' || openDebts.length > 0) && (
+        <Pressable accessibilityRole="button" accessibilityLabel={section === 'debt' ? 'Tambah hutang' : section === 'deposit' ? 'Tambah setoran' : 'Tambah biaya rutin'} onPress={() => navigate(section)}
+          style={({ pressed }) => [styles.fab, { backgroundColor: colors.action, bottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 18 }, pressed && styles.pressed]}>
+          <Feather name="plus" size={19} color={colors.actionForeground} /><Text style={[styles.fabText, { color: colors.actionForeground }]}>Tambah {section === 'debt' ? 'hutang' : section === 'deposit' ? 'setoran' : 'rutin'}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 }, content: { paddingHorizontal: 20 }, pressed: { opacity: 0.72 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 26 },
+  brandMark: { width: 22, height: 22, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }, brand: { fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: -0.7 },
+  privateLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 9, letterSpacing: 1.2, marginLeft: 'auto' },
+  title: { fontFamily: 'Inter_700Bold', fontSize: 28, letterSpacing: -1.1 }, subtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 20, marginTop: 6, marginBottom: 21 },
+  summary: { marginTop: 21, padding: 20, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  summaryHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, summaryEyebrow: { fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 1.1, opacity: 0.76 },
+  summaryColumns: { flexDirection: 'row', alignItems: 'center', marginTop: 18, gap: 14 }, summaryColumn: { flex: 1, minWidth: 0 },
+  summaryLabel: { fontFamily: 'Inter_500Medium', fontSize: 11, opacity: 0.8 }, summaryNumber: { fontFamily: 'Inter_700Bold', fontSize: 20, letterSpacing: -0.6, marginTop: 5 },
+  summaryLine: { width: StyleSheet.hairlineWidth, height: 42, opacity: 0.4 }, summaryFoot: { fontFamily: 'Inter_500Medium', fontSize: 11, opacity: 0.78, marginTop: 19, paddingTop: 13, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.25)' },
+  sectionTabs: { flexDirection: 'row', gap: 6, marginTop: 26, marginBottom: 18 }, sectionTab: { flex: 1, minWidth: 0, minHeight: 43, borderWidth: 1, borderRadius: 7, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, paddingHorizontal: 3 },
+  sectionTabText: { fontFamily: 'Inter_600SemiBold', fontSize: 10 }, group: { gap: 10, marginBottom: 22 }, groupHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 3 },
+  groupTitle: { fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: -0.4 }, groupSub: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 4 }, groupCount: { fontFamily: 'Inter_700Bold', fontSize: 13 },
+  card: { borderWidth: 1, borderRadius: 9, padding: 15 }, cardTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  cardIcon: { height: 39, width: 39, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }, cardMain: { flex: 1, minWidth: 0 },
+  cardTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14 }, cardSub: { fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  smallAction: { width: 29, height: 29, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  balanceRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 18, gap: 8 }, eyebrow: { fontFamily: 'Inter_600SemiBold', fontSize: 9, letterSpacing: 0.9 },
+  balance: { fontFamily: 'Inter_700Bold', fontSize: 22, letterSpacing: -0.5, marginTop: 4 }, total: { fontFamily: 'Inter_400Regular', fontSize: 10, paddingBottom: 3 },
+  progressTrack: { height: 5, borderRadius: 3, marginTop: 13, overflow: 'hidden' }, progressFill: { height: '100%', borderRadius: 3 },
+  note: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17, marginTop: 12 },
+  cardDivider: { height: StyleSheet.hairlineWidth, marginVertical: 15 }, depositHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  depositHeadingText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 }, inlineAdd: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  inlineAddText: { fontFamily: 'Inter_600SemiBold', fontSize: 11 }, depositEmpty: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17, marginTop: 11 },
+  depositLine: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingTop: 11, marginTop: 11, borderTopWidth: StyleSheet.hairlineWidth },
+  depositDot: { height: 25, width: 25, borderRadius: 5, alignItems: 'center', justifyContent: 'center' }, depositCopy: { flex: 1, minWidth: 0 },
+  depositAmount: { fontFamily: 'Inter_600SemiBold', fontSize: 12 }, depositMeta: { fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  rowIcon: { width: 25, height: 29, alignItems: 'center', justifyContent: 'center' },
+  dueRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 }, dueText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
+  payButton: { height: 39, borderRadius: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 16 }, payText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  quietRow: { borderWidth: 1, borderRadius: 8, padding: 17 }, quietText: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  secondaryAction: { height: 46, borderWidth: 1, borderRadius: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginBottom: 15 },
+  secondaryActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  depositNotice: { borderWidth: 1, borderRadius: 8, padding: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 11, marginBottom: 3 },
+  depositNoticeCopy: { flex: 1 }, depositNoticeTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  depositNoticeBody: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17, marginTop: 5 },
+  noticeLink: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: 10 },
+  archive: { borderWidth: 1, borderRadius: 9, padding: 16, marginTop: 6 },
+  empty: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 22, paddingVertical: 30, alignItems: 'center', marginTop: 5 },
+  emptyIcon: { height: 55, width: 55, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontFamily: 'Inter_700Bold', fontSize: 16, textAlign: 'center', marginTop: 15 }, emptyCopy: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 19, textAlign: 'center', marginTop: 7 },
+  emptyButton: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 7, paddingHorizontal: 16, paddingVertical: 12, marginTop: 19 },
+  emptyButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  error: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 7, padding: 11, marginBottom: 13 }, errorText: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 11 }, retry: { fontFamily: 'Inter_700Bold', fontSize: 11 },
+  skeletons: { gap: 12 }, skeletonTitle: { height: 22, width: 150, borderRadius: 5 }, skeletonCard: { height: 175, borderRadius: 9 },
+  fab: { position: 'absolute', alignSelf: 'center', height: 52, borderRadius: 8, paddingHorizontal: 19, flexDirection: 'row', alignItems: 'center', gap: 8, elevation: 5 },
+  fabText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+});

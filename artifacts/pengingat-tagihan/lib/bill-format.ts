@@ -20,6 +20,13 @@ export function getNextMonthlyDueDate(value: string, originalDay: number): strin
   return getLocalDateString(new Date(year, month, Math.min(originalDay, lastDayOfNextMonth)));
 }
 
+export function getNextWeeklyDueDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number);
+  const next = new Date(year, month - 1, day);
+  next.setDate(next.getDate() + 7);
+  return getLocalDateString(next);
+}
+
 export function formatRupiah(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',

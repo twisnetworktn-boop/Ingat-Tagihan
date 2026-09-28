@@ -28,10 +28,13 @@ Aplikasi mobile offline untuk mencatat berbagai tagihan, memantau jatuh tempo, d
 - Data stays on the device because the app must work without internet. Do not add a server dependency to the core bill flows.
 - Reminder permission is requested only when a user turns on a bill's local reminder.
 - Confirming payment keeps the paid bill as history and creates the next monthly bill. The original due-day anchors months shorter than that day; deleting an active bill stops its series without removing older paid history.
+- Bills can instead be marked once-only: their reminder fires once and confirming payment preserves the log without creating another bill. Older saved bills remain monthly by default.
+- The offline Catatan menu tracks debts in either direction, deposits against debts, and weekly/monthly routine expenses. Routine payments keep history and advance the next due date; optional local reminders are scheduled once per due date.
 
 ## Product
 
 - Add, edit, delete, and mark bills paid; categorize bills; view due dates and outstanding total; schedule optional local reminders.
+- In Catatan, track money owed in both directions, record partial settlements, and manage weekly or monthly recurring costs.
 
 ## User preferences
 

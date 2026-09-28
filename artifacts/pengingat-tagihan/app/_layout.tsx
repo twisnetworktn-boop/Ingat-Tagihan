@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { BillsProvider } from '@/contexts/BillsContext';
+import { NotesProvider } from '@/contexts/NotesContext';
 import { useColors } from '@/hooks/useColors';
 import {
   Inter_400Regular,
@@ -39,6 +40,8 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="bill-form" />
+      <Stack.Screen name="catatan" />
+      <Stack.Screen name="catatan-form" />
     </Stack>
   );
 }
@@ -67,8 +70,10 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <BillsProvider>
-                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-                <RootLayoutNav />
+                <NotesProvider>
+                  <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+                  <RootLayoutNav />
+                </NotesProvider>
               </BillsProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

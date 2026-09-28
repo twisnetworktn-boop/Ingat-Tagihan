@@ -33,13 +33,17 @@ export type Bill = {
   note: string;
   isPaid: boolean;
   remind: boolean;
+  repeat?: 'monthly' | 'once';
   notificationId?: string;
   seriesId?: string;
   recurrenceDay?: number;
   paidAt?: string;
 };
 
-export type BillInput = Pick<Bill, 'title' | 'amount' | 'dueDate' | 'category' | 'note' | 'remind'> & { id?: string };
+export type BillInput = Pick<Bill, 'title' | 'amount' | 'dueDate' | 'category' | 'note' | 'remind'> & {
+  id?: string;
+  repeat?: Bill['repeat'];
+};
 
 type BillsContextValue = {
   bills: Bill[];
@@ -192,6 +196,7 @@ export function BillsProvider({ children }: { children: ReactNode }) {
     const nextBill: Bill = {
       ...input,
       id,
+      repeat: input.repeat ?? previous?.repeat ?? 'monthly',
       isPaid: previous?.isPaid ?? false,
       paidAt: previous?.paidAt,
       seriesId: previous?.seriesId ?? id,
@@ -246,7 +251,7 @@ export function BillsProvider({ children }: { children: ReactNode }) {
       seriesId: bill.seriesId ?? bill.id,
       recurrenceDay,
     };
-    const nextBill: Bill = {
+    const nextBill: Bill | undefined = bill.repeat === 'once' ? undefined : {
       ...bill,
       id: createBillId(),
       dueDate: getNextMonthlyDueDate(bill.dueDate, recurrenceDay),
@@ -257,16 +262,21 @@ export function BillsProvider({ children }: { children: ReactNode }) {
       recurrenceDay,
     };
     let reminderWarning: string | null = null;
-    try {
-      nextBill.notificationId = await scheduleBillReminder(nextBill);
-    } catch {
-      reminderWarning = 'Pembayaran tersimpan, tetapi pengingat tagihan berikutnya belum bisa dijadwalkan. Periksa izin notifikasi.';
+    if (nextBill) {
+      try {
+        nextBill.notificationId = await scheduleBillReminder(nextBill);
+      } catch {
+        reminderWarning = 'Pembayaran tersimpan, tetapi pengingat tagihan berikutnya belum bisa dijadwalkan. Periksa izin notifikasi.';
+      }
     }
 
     try {
-      await persist([nextBill, ...billsRef.current.map((item) => (item.id === id ? paid : item))]);
+      await persist([
+        ...(nextBill ? [nextBill] : []),
+        ...billsRef.current.map((item) => (item.id === id ? paid : item)),
+      ]);
     } catch (cause) {
-      if (nextBill.notificationId) await cancelBillReminder(nextBill.notificationId).catch(() => undefined);
+      if (nextBill?.notificationId) await cancelBillReminder(nextBill.notificationId).catch(() => undefined);
       throw cause;
     }
 
