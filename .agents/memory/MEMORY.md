@@ -1,0 +1,1 @@
+- [GitHub connector pushes](github-connector-pushes.md) — connector auth covers GitHub REST, not shell Git; empty repositories require initialization before Git Data API writes.
