@@ -21,13 +21,14 @@ export function TopMenu({ active }: { active: 'bills' | 'notes' }) {
             onPress={() => { if (!selected) router.replace(item.route); }}
             style={({ pressed }) => [
               styles.tab,
-              selected && { backgroundColor: colors.card, borderColor: colors.border },
+              { backgroundColor: colors.menuButtonBackground },
+              selected && { borderColor: colors.primary, borderWidth: 2 },
               pressed && styles.pressed,
             ]}
             testID={`menu-${item.key}`}
           >
-            <Feather name={item.icon} size={15} color={selected ? colors.primary : colors.actionForeground} />
-            <Text style={[styles.label, { color: selected ? colors.foreground : colors.actionForeground }]}>{item.label}</Text>
+            <Feather name={item.icon} size={15} color={selected ? colors.primary : colors.menuButtonForeground} />
+            <Text style={[styles.label, { color: selected ? colors.primary : colors.menuButtonForeground }]}>{item.label}</Text>
           </Pressable>
         );
       })}
