@@ -7,7 +7,7 @@ import { useColors } from '@/hooks/useColors';
 export function TopMenu({ active }: { active: 'bills' | 'notes' }) {
   const colors = useColors();
   return (
-    <View accessibilityRole="tablist" style={[styles.wrap, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+    <View accessibilityRole="tablist" style={[styles.wrap, { backgroundColor: colors.action, borderColor: colors.action }]}>
       {([
         { key: 'bills', label: 'Tagihan', icon: 'calendar', route: '/' },
         { key: 'notes', label: 'Catatan', icon: 'book-open', route: '/catatan' },
@@ -26,8 +26,8 @@ export function TopMenu({ active }: { active: 'bills' | 'notes' }) {
             ]}
             testID={`menu-${item.key}`}
           >
-            <Feather name={item.icon} size={15} color={selected ? colors.primary : colors.mutedForeground} />
-            <Text style={[styles.label, { color: selected ? colors.foreground : colors.mutedForeground }]}>{item.label}</Text>
+            <Feather name={item.icon} size={15} color={selected ? colors.primary : colors.actionForeground} />
+            <Text style={[styles.label, { color: selected ? colors.foreground : colors.actionForeground }]}>{item.label}</Text>
           </Pressable>
         );
       })}

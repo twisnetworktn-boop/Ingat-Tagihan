@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform } from 'react-native';
-import { ensureReminderPermission } from '@/contexts/BillsContext';
-import { formatRupiah, getNextMonthlyDueDate, getNextWeeklyDueDate, isValidBillDate } from '@/lib/bill-format';
+import { ensureReminderPermission, type BillCategory } from '@/contexts/BillsContext';
+import { formatRupiah, getNextExpenseDueDate, isValidBillDate } from '@/lib/bill-format';
 
 const STORAGE_KEY = '@ingat-tagihan/notes/v1';
 const ANDROID_CHANNEL_ID = 'bill-reminders';
@@ -32,10 +32,11 @@ export type Routine = {
   title: string;
   amount: number;
   dueDate: string;
-  frequency: 'weekly' | 'monthly';
+  frequency: 'once' | 'weekly' | 'monthly';
   anchorDay: number;
   remind: boolean;
   note: string;
+  category?: BillCategory;
   notificationId?: string;
 };
 
@@ -46,11 +47,12 @@ export type RoutinePayment = {
   amount: number;
   dueDate: string;
   paidAt: string;
+  category?: BillCategory;
 };
 
 type DebtInput = Omit<Debt, 'id' | 'notificationId'> & { id?: string };
 type DepositInput = Omit<Deposit, 'id'> & { id?: string };
-type RoutineInput = Omit<Routine, 'id' | 'anchorDay' | 'notificationId'> & { id?: string };
+type RoutineInput = Omit<Routine, 'id' | 'anchorDay' | 'notificationId' | 'category'> & { id?: string; category: BillCategory };
 type NotesData = {
   debts: Debt[];
   deposits: Deposit[];
@@ -100,7 +102,7 @@ async function scheduleReminder(
   if (!permission.granted) throw new Error('Izin notifikasi belum aktif.');
   const title = kind === 'debt'
     ? (item as Debt).direction === 'owe' ? 'Hutang perlu dibayar' : 'Piutang perlu ditagih'
-    : 'Biaya rutin perlu dibayar';
+    : (item as Routine).frequency === 'once' ? 'Pengeluaran perlu dibayar' : 'Biaya rutin perlu dibayar';
   const detail = kind === 'debt' ? (item as Debt).person : (item as Routine).title;
   return Notifications.scheduleNotificationAsync({
     content: {
@@ -334,7 +336,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const payRoutine = useCallback((id: string) => enqueue(async () => {
     const current = dataRef.current;
     const routine = current.routines.find((item) => item.id === id);
-    if (!routine) throw new Error('Biaya rutin tidak ditemukan.');
+    if (!routine) throw new Error('Pengeluaran tidak ditemukan.');
     const payment: RoutinePayment = {
       id: createId(),
       routineId: id,
@@ -342,25 +344,27 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       amount: routine.amount,
       dueDate: routine.dueDate,
       paidAt: new Date().toISOString(),
+      category: routine.category ?? 'other',
     };
-    const nextRoutine: Routine = {
-      ...routine,
-      dueDate: routine.frequency === 'weekly'
-        ? getNextWeeklyDueDate(routine.dueDate)
-        : getNextMonthlyDueDate(routine.dueDate, routine.anchorDay),
-      notificationId: undefined,
-    };
+    const nextDueDate = getNextExpenseDueDate(routine.frequency, routine.dueDate, routine.anchorDay);
+    const nextRoutine: Routine | null = nextDueDate
+      ? { ...routine, dueDate: nextDueDate, notificationId: undefined }
+      : null;
     let warning: string | null = null;
-    try { nextRoutine.notificationId = await scheduleReminder('routine', nextRoutine); }
-    catch { warning = 'Pembayaran tersimpan, tetapi pengingat berikutnya belum bisa dijadwalkan.'; }
+    if (nextRoutine) {
+      try { nextRoutine.notificationId = await scheduleReminder('routine', nextRoutine); }
+      catch { warning = 'Pembayaran tersimpan, tetapi pengingat berikutnya belum bisa dijadwalkan.'; }
+    }
     try {
       await persist({
         ...current,
-        routines: current.routines.map((item) => item.id === id ? nextRoutine : item),
+        routines: nextRoutine
+          ? current.routines.map((item) => item.id === id ? nextRoutine : item)
+          : current.routines.filter((item) => item.id !== id),
         routinePayments: [payment, ...current.routinePayments],
       });
     } catch (cause) {
-      await cancelReminder(nextRoutine.notificationId).catch(() => undefined);
+      await cancelReminder(nextRoutine?.notificationId).catch(() => undefined);
       throw cause;
     }
     if (routine.notificationId) {

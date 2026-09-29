@@ -4,7 +4,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import * as Notifications from 'expo-notifications';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { getNextMonthlyDueDate } from '@/lib/bill-format';
+import { formatRupiah, getNextMonthlyDueDate } from '@/lib/bill-format';
 
 const STORAGE_KEY = '@ingat-tagihan/bills/v1';
 const ANDROID_CHANNEL_ID = 'bill-reminders';
@@ -111,11 +111,7 @@ async function scheduleBillReminder(bill: Bill): Promise<string | undefined> {
   const reminder = getReminderDate(bill.dueDate);
   if (!reminder) return undefined;
 
-  const amount = new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(bill.amount);
+  const amount = formatRupiah(bill.amount);
 
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {

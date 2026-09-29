@@ -27,12 +27,27 @@ export function getNextWeeklyDueDate(value: string): string {
   return getLocalDateString(next);
 }
 
+export function getNextExpenseDueDate(frequency: 'once' | 'weekly' | 'monthly', dueDate: string, anchorDay: number): string | null {
+  if (frequency === 'once') return null;
+  return frequency === 'weekly'
+    ? getNextWeeklyDueDate(dueDate)
+    : getNextMonthlyDueDate(dueDate, anchorDay);
+}
+
 export function formatRupiah(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+export function normalizeRupiahInput(value: string): string {
+  return value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 15);
+}
+
+export function formatRupiahInput(value: string): string {
+  return value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
 function parseLocalDate(value: string): Date {

@@ -15,9 +15,9 @@ import {
 } from 'react-native';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { SurfaceBackground } from '@/components/SurfaceBackground';
-import { BILL_CATEGORIES, ensureReminderPermission, type BillCategory, useBills } from '@/contexts/BillsContext';
+import { ensureReminderPermission, useBills } from '@/contexts/BillsContext';
 import { useColors } from '@/hooks/useColors';
-import { formatDateInput, formatRupiah, getDaysUntilDue, getLocalDateString, isValidBillDate } from '@/lib/bill-format';
+import { formatDateInput, formatRupiah, formatRupiahInput, getDaysUntilDue, getLocalDateString, isValidBillDate, normalizeRupiahInput } from '@/lib/bill-format';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type DatePreset = { label: string; offset: number };
@@ -36,7 +36,6 @@ export default function BillFormScreen() {
   const [title, setTitle] = useState(existing?.title ?? '');
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
   const [dueDate, setDueDate] = useState(existing?.dueDate ?? '');
-  const [category, setCategory] = useState<BillCategory>(existing?.category ?? 'electricity');
   const [note, setNote] = useState(existing?.note ?? '');
   const [remind, setRemind] = useState(existing?.remind ?? false);
   const [repeat, setRepeat] = useState<'monthly' | 'once'>(existing?.repeat ?? 'monthly');
@@ -97,10 +96,15 @@ export default function BillFormScreen() {
     setDueDate(getLocalDateString(date));
   };
 
+  const returnToBills = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
   const submit = async () => {
     setFormError(null);
     if (!titleValid) {
-      setFormError('Nama tagihan perlu diisi.');
+      setFormError('Nama orang perlu diisi.');
       return;
     }
     if (!amountValid) {
@@ -123,12 +127,12 @@ export default function BillFormScreen() {
         title: title.trim(),
         amount: amountValue,
         dueDate,
-        category,
+        category: existing?.category ?? 'other',
         note: note.trim(),
         repeat,
         remind,
       });
-      router.back();
+      returnToBills();
     } catch (cause) {
       setFormError(cause instanceof Error ? cause.message : 'Tagihan belum bisa disimpan. Coba lagi.');
     } finally {
@@ -151,7 +155,7 @@ export default function BillFormScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Kembali"
-          onPress={() => router.back()}
+          onPress={returnToBills}
           style={({ pressed }) => [styles.backButton, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}
         >
           <Feather name="arrow-left" size={18} color={colors.foreground} />
@@ -187,14 +191,14 @@ export default function BillFormScreen() {
             <Text style={[styles.currencyPrefix, { color: colors.primaryForeground }]}>Rp</Text>
             <TextInput
               accessibilityLabel="Nominal tagihan"
-              value={amount}
-              onChangeText={(value) => setAmount(value.replace(/[^\d]/g, ''))}
+              value={formatRupiahInput(amount)}
+              onChangeText={(value) => setAmount(normalizeRupiahInput(value))}
               keyboardType="number-pad"
               placeholder="0"
               placeholderTextColor={colors.primaryForeground}
               returnKeyType="next"
               style={[styles.amountInput, { color: colors.primaryForeground }]}
-              maxLength={15}
+              maxLength={19}
               testID="bill-amount"
             />
           </View>
@@ -202,14 +206,14 @@ export default function BillFormScreen() {
         </LinearGradient>
 
         <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: colors.foreground }]}>Nama tagihan</Text>
+          <Text style={[styles.label, { color: colors.foreground }]}>Nama Orang</Text>
           <View style={[styles.inputShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="edit-3" size={16} color={colors.mutedForeground} />
             <TextInput
-              accessibilityLabel="Nama tagihan"
+              accessibilityLabel="Nama Orang"
               value={title}
               onChangeText={setTitle}
-              placeholder="Contoh: Internet rumah"
+              placeholder="Contoh: Budi"
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="sentences"
               returnKeyType="next"
@@ -221,29 +225,20 @@ export default function BillFormScreen() {
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: colors.foreground }]}>Kategori</Text>
-          <View style={styles.categoryGrid}>
-            {BILL_CATEGORIES.map((item) => {
-              const selected = item.id === category;
-              return (
-                <Pressable
-                  key={item.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => setCategory(item.id)}
-                  style={({ pressed }) => [
-                    styles.categoryOption,
-                    { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border },
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Feather name={item.icon} size={15} color={selected ? colors.primary : colors.mutedForeground} />
-                  <Text style={[styles.categoryText, { color: selected ? colors.primary : colors.mutedForeground }]}>
-                    {item.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          <Text style={[styles.label, { color: colors.foreground }]}>Catatan/Keterangan <Text style={{ color: colors.mutedForeground }}>(opsional)</Text></Text>
+          <View style={[styles.noteShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TextInput
+              accessibilityLabel="Catatan/Keterangan"
+              value={note}
+              onChangeText={setNote}
+              placeholder="Tambahkan keterangan tagihan..."
+              placeholderTextColor={colors.mutedForeground}
+              multiline
+              maxLength={180}
+              textAlignVertical="top"
+              style={[styles.noteInput, { color: colors.foreground }]}
+              testID="bill-note"
+            />
           </View>
         </View>
 
@@ -344,24 +339,6 @@ export default function BillFormScreen() {
           </Text>
         ) : null}
 
-        <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: colors.foreground }]}>Catatan (opsional)</Text>
-          <View style={[styles.noteShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <TextInput
-              accessibilityLabel="Catatan tagihan"
-              value={note}
-              onChangeText={setNote}
-              placeholder="Nomor pelanggan atau info pembayaran"
-              placeholderTextColor={colors.mutedForeground}
-              multiline
-              maxLength={180}
-              textAlignVertical="top"
-              style={[styles.noteInput, { color: colors.foreground }]}
-              testID="bill-note"
-            />
-          </View>
-        </View>
-
         {formError ? (
           <View style={[styles.errorBox, { backgroundColor: colors.accent }]}>
             <Feather name="alert-circle" size={15} color={colors.accentForeground} />
@@ -410,7 +387,7 @@ const styles = StyleSheet.create({
   amountLabel: { opacity: 0.76, fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 1 },
   amountInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   currencyPrefix: { fontFamily: 'Inter_600SemiBold', fontSize: 23, marginRight: 9 },
-  amountInput: { flex: 1, padding: 0, fontFamily: 'Inter_700Bold', fontSize: 34, letterSpacing: -1.1 },
+  amountInput: { flex: 1, minWidth: 0, padding: 0, fontFamily: 'Inter_700Bold', fontSize: 34, letterSpacing: -1.1 },
   amountFormatted: { opacity: 0.7, marginTop: 3, fontFamily: 'Inter_500Medium', fontSize: 11 },
   fieldGroup: { gap: 9 },
   label: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
@@ -418,8 +395,6 @@ const styles = StyleSheet.create({
   datePreview: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   inputShell: { minHeight: 49, borderRadius: 7, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 },
   textInput: { flex: 1, paddingVertical: 11, fontFamily: 'Inter_400Regular', fontSize: 13 },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  categoryOption: { minWidth: '30%', flexGrow: 1, flexBasis: '30%', minHeight: 43, borderRadius: 7, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 8 },
   categoryText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   datePresets: { flexDirection: 'row', gap: 8 },
   datePreset: { flex: 1, minWidth: 0, alignItems: 'center', borderRadius: 6, borderWidth: 1, paddingHorizontal: 4, paddingVertical: 7 },

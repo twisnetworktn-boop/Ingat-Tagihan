@@ -6,12 +6,17 @@ import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Tex
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SurfaceBackground } from '@/components/SurfaceBackground';
 import { TopMenu } from '@/components/TopMenu';
+import { BILL_CATEGORIES, type BillCategory } from '@/contexts/BillsContext';
 import { useNotes, type Debt, type Deposit, type Routine, type RoutinePayment } from '@/contexts/NotesContext';
 import { useColors } from '@/hooks/useColors';
-import { formatDateInput, formatRupiah, getLocalDateString, getNextMonthlyDueDate } from '@/lib/bill-format';
+import { formatDateInput, formatRupiah, getLocalDateString, getNextExpenseDueDate } from '@/lib/bill-format';
 
 type Section = 'debt' | 'routine';
 type Palette = ReturnType<typeof useColors>;
+
+function expenseCategory(category?: BillCategory) {
+  return BILL_CATEGORIES.find(item => item.id === category) ?? BILL_CATEGORIES[5];
+}
 
 function confirmAction(title: string, message: string, action: string, destructive: boolean, onConfirm: () => void) {
   if (Platform.OS === 'web') {
@@ -103,21 +108,24 @@ function DebtCard({ debt, deposits, colors, onEdit, onDelete, onAddDeposit, onEd
 function RoutineCard({ routine, payments, colors, onEdit, onDelete, onPay }: {
   routine: Routine; payments: RoutinePayment[]; colors: Palette; onEdit: () => void; onDelete: () => void; onPay: () => void;
 }) {
-  const due = routine.dueDate < getLocalDateString(new Date()) ? 'Lewat jatuh tempo' : `Berikutnya ${formatDateInput(routine.dueDate)}`;
+  const category = expenseCategory(routine.category);
+  const due = routine.dueDate < getLocalDateString(new Date())
+    ? 'Lewat jatuh tempo'
+    : `${routine.frequency === 'once' ? 'Jatuh tempo' : 'Berikutnya'} ${formatDateInput(routine.dueDate)}`;
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.cardTop}>
-        <View style={[styles.cardIcon, { backgroundColor: colors.secondary }]}><Feather name="repeat" size={18} color={colors.primary} /></View>
+        <View style={[styles.cardIcon, { backgroundColor: colors.secondary }]}><Feather name={category.icon} size={18} color={colors.primary} /></View>
         <View style={styles.cardMain}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{routine.title}</Text>
-          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Setiap {routine.frequency === 'weekly' ? 'minggu' : 'bulan'}</Text>
+          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{category.label} · {routine.frequency === 'once' ? 'Sekali bayar' : `Setiap ${routine.frequency === 'weekly' ? 'minggu' : 'bulan'}`}</Text>
         </View>
         <SmallAction icon="edit-2" label={`Ubah ${routine.title}`} onPress={onEdit} colors={colors} />
         <SmallAction icon="trash-2" label={`Hapus ${routine.title}`} onPress={onDelete} colors={colors} danger />
       </View>
       <View style={styles.balanceRow}>
         <View>
-          <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>PER PERIODE</Text>
+          <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>{routine.frequency === 'once' ? 'NOMINAL PENGELUARAN' : 'PER PERIODE'}</Text>
           <Text style={[styles.balance, { color: colors.foreground }]}>{formatRupiah(routine.amount)}</Text>
         </View>
         {routine.remind && <Feather name="bell" size={15} color={colors.primary} />}
@@ -137,7 +145,7 @@ function RoutineCard({ routine, payments, colors, onEdit, onDelete, onPay }: {
           <View style={[styles.depositDot, { backgroundColor: colors.actionSoft }]}><Feather name="check" size={13} color={colors.action} /></View>
           <View style={styles.depositCopy}>
             <Text style={[styles.depositAmount, { color: colors.foreground }]}>{formatRupiah(payment.amount)}</Text>
-            <Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {payment.paidAt.slice(0, 10)}</Text>
+            <Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>{expenseCategory(payment.category).label} · Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {payment.paidAt.slice(0, 10)}</Text>
           </View>
         </View>
       ))}
@@ -165,16 +173,13 @@ export default function CatatanScreen() {
   const action = (task: () => Promise<void>) => { void task().catch(showError); };
   const removeDebt = (debt: Debt) => confirmAction('Hapus catatan utang?', `${debt.person} dan semua setoran yang terkait akan dihapus permanen.`, 'Hapus utang', true, () => action(() => deleteDebt(debt.id)));
   const removeDeposit = (deposit: Deposit) => confirmAction('Hapus setoran?', `${formatRupiah(deposit.amount)} akan dihapus dan saldo utang kembali bertambah.`, 'Hapus setoran', true, () => action(() => deleteDeposit(deposit.id)));
-  const removeRoutine = (routine: Routine) => confirmAction('Hapus pengeluaran rutin?', `${routine.title} tidak akan berulang lagi. Riwayat pembayaran sebelumnya tetap tersimpan.`, 'Hapus rutin', true, () => action(() => deleteRoutine(routine.id)));
+  const removeRoutine = (routine: Routine) => confirmAction('Hapus pengeluaran?', `${routine.title} akan dihapus dari daftar. Riwayat pembayaran sebelumnya tetap tersimpan.`, 'Hapus', true, () => action(() => deleteRoutine(routine.id)));
   const markRoutine = (routine: Routine) => {
-    let nextDate: string;
-    if (routine.frequency === 'weekly') {
-      const [year, month, day] = routine.dueDate.split('-').map(Number);
-      const next = new Date(year, month - 1, day);
-      next.setDate(next.getDate() + 7);
-      nextDate = getLocalDateString(next);
-    } else nextDate = getNextMonthlyDueDate(routine.dueDate, routine.anchorDay);
-    confirmAction('Sudah dibayar?', `${formatRupiah(routine.amount)} untuk ${routine.title} akan masuk riwayat. Jatuh tempo berikutnya ${formatDateInput(nextDate)}.`, 'Sudah dibayar', false, () => action(() => payRoutine(routine.id)));
+    const nextDate = getNextExpenseDueDate(routine.frequency, routine.dueDate, routine.anchorDay);
+    const nextStep = nextDate
+      ? `Jatuh tempo berikutnya ${formatDateInput(nextDate)}.`
+      : 'Pengeluaran ini selesai dan tidak akan dibuat ulang.';
+    confirmAction('Sudah dibayar?', `${formatRupiah(routine.amount)} untuk ${routine.title} akan masuk riwayat. ${nextStep}`, 'Sudah dibayar', false, () => action(() => payRoutine(routine.id)));
   };
   const navigate = (type: 'debt' | 'deposit' | 'routine', id?: string, debtId?: string) => router.push({ pathname: '/catatan-form', params: { type, ...(id ? { id } : {}), ...(debtId ? { debtId } : {}) } });
   const refresh = async () => { setRefreshing(true); try { await reload(); } catch (cause) { showError(cause); } finally { setRefreshing(false); } };
@@ -209,7 +214,7 @@ export default function CatatanScreen() {
           <Text style={[styles.brand, { color: colors.foreground }]}>ingat</Text>
           <Text style={[styles.privateLabel, { color: colors.mutedForeground }]}>RUANG PRIBADI</Text>
         </View>
-        <Text style={[styles.title, { color: colors.foreground }]}>Catatan kamu</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>Ayo Catat</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Utang dan pengeluaran rutin, tersimpan rapi di sini.</Text>
         <TopMenu active="notes" />
 
@@ -220,7 +225,7 @@ export default function CatatanScreen() {
             <View style={[styles.summaryLine, { backgroundColor: colors.primaryForeground }]} />
             <View style={styles.summaryColumn}><Text style={[styles.summaryLabel, { color: colors.primaryForeground }]}>Perlu kuterima</Text><Text numberOfLines={1} adjustsFontSizeToFit style={[styles.summaryNumber, { color: colors.primaryForeground }]}>{formatRupiah(owedTotal)}</Text></View>
           </View>
-          <Text style={[styles.summaryFoot, { color: colors.primaryForeground }]}>{openCount} utang berjalan · {routines.length} pengeluaran rutin</Text>
+          <Text style={[styles.summaryFoot, { color: colors.primaryForeground }]}>{openCount} utang berjalan · {routines.length} pengeluaran berjalan</Text>
         </LinearGradient>
 
         <View style={styles.sectionTabs}>
@@ -255,8 +260,8 @@ export default function CatatanScreen() {
           <>
             <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}><Feather name={section === 'debt' ? 'book-open' : 'repeat'} size={25} color={colors.primary} /></View>
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{section === 'debt' ? 'Mulai dari satu catatan' : 'Belum ada pengeluaran rutin'}</Text>
-              <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>{section === 'debt' ? 'Catat siapa dan berapa, lalu kurangi saldonya setiap kali ada setoran.' : 'Catat pengeluaran yang kembali tiap minggu atau bulan. Riwayat bayar akan tersimpan.'}</Text>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{section === 'debt' ? 'Mulai dari satu catatan' : 'Belum ada pengeluaran'}</Text>
+              <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>{section === 'debt' ? 'Catat siapa dan berapa, lalu kurangi saldonya setiap kali ada setoran.' : 'Catat pengeluaran sekali bayar atau yang berulang tiap minggu atau bulan. Riwayat bayar akan tersimpan.'}</Text>
               <Pressable onPress={() => navigate(section)} style={[styles.emptyButton, { backgroundColor: colors.action }]}>
                 <Feather name="plus" size={16} color={colors.actionForeground} /><Text style={[styles.emptyButtonText, { color: colors.actionForeground }]}>Tambah {section === 'debt' ? 'hutang' : 'pengeluaran'}</Text>
               </Pressable>
@@ -266,7 +271,7 @@ export default function CatatanScreen() {
                 <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pembayaran tersimpan</Text>
                 {[...routinePayments].sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
                   <View key={payment.id} style={[styles.depositLine, { borderTopColor: colors.border }]}>
-                    <View style={styles.depositCopy}><Text style={[styles.depositAmount, { color: colors.foreground }]}>{payment.title} · {formatRupiah(payment.amount)}</Text><Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {payment.paidAt.slice(0, 10)}</Text></View>
+                    <View style={styles.depositCopy}><Text style={[styles.depositAmount, { color: colors.foreground }]}>{payment.title} · {formatRupiah(payment.amount)}</Text><Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>{expenseCategory(payment.category).label} · Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {payment.paidAt.slice(0, 10)}</Text></View>
                   </View>
                 ))}
               </View>
@@ -284,17 +289,17 @@ export default function CatatanScreen() {
           </>
         ) : (
           <View style={styles.group}>
-            <View style={styles.groupHeading}><View><Text style={[styles.groupTitle, { color: colors.foreground }]}>Siklus berjalan</Text><Text style={[styles.groupSub, { color: colors.mutedForeground }]}>Konfirmasi saat sudah dibayar</Text></View><Text style={[styles.groupCount, { color: colors.primary }]}>{routines.length}</Text></View>
+            <View style={styles.groupHeading}><View><Text style={[styles.groupTitle, { color: colors.foreground }]}>Pengeluaran berjalan</Text><Text style={[styles.groupSub, { color: colors.mutedForeground }]}>Konfirmasi saat sudah dibayar</Text></View><Text style={[styles.groupCount, { color: colors.primary }]}>{routines.length}</Text></View>
             {[...routines].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).map(routine => (
               <RoutineCard key={routine.id} routine={routine} payments={routinePayments.filter(x => x.routineId === routine.id)} colors={colors}
                 onEdit={() => navigate('routine', routine.id)} onDelete={() => removeRoutine(routine)} onPay={() => markRoutine(routine)} />
             ))}
             {routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)).length > 0 && (
               <View style={[styles.archive, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat dari rutin yang dihapus</Text>
+                <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pengeluaran selesai</Text>
                 {routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)).sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
                   <View key={payment.id} style={[styles.depositLine, { borderTopColor: colors.border }]}>
-                    <View style={styles.depositCopy}><Text style={[styles.depositAmount, { color: colors.foreground }]}>{payment.title} · {formatRupiah(payment.amount)}</Text><Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {payment.paidAt.slice(0, 10)}</Text></View>
+                    <View style={styles.depositCopy}><Text style={[styles.depositAmount, { color: colors.foreground }]}>{payment.title} · {formatRupiah(payment.amount)}</Text><Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>{expenseCategory(payment.category).label} · Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {payment.paidAt.slice(0, 10)}</Text></View>
                   </View>
                 ))}
               </View>

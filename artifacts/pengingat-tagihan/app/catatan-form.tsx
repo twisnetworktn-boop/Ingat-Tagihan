@@ -6,10 +6,10 @@ import { Alert, Linking, Platform, Pressable, StyleSheet, Switch, Text, TextInpu
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { SurfaceBackground } from '@/components/SurfaceBackground';
-import { ensureReminderPermission } from '@/contexts/BillsContext';
-import { useNotes, type Debt } from '@/contexts/NotesContext';
+import { BILL_CATEGORIES, ensureReminderPermission, type BillCategory } from '@/contexts/BillsContext';
+import { useNotes, type Debt, type Routine } from '@/contexts/NotesContext';
 import { useColors } from '@/hooks/useColors';
-import { formatDateInput, formatRupiah, getLocalDateString, isValidBillDate } from '@/lib/bill-format';
+import { formatDateInput, formatRupiah, formatRupiahInput, getLocalDateString, isValidBillDate, normalizeRupiahInput } from '@/lib/bill-format';
 
 type RecordType = 'debt' | 'deposit' | 'routine';
 
@@ -26,11 +26,13 @@ export default function CatatanFormScreen() {
   const [direction, setDirection] = useState<Debt['direction']>('owe');
   const [person, setPerson] = useState('');
   const [title, setTitle] = useState('');
+  const [category, setCategory] = useState<BillCategory>('other');
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState(getLocalDateString(new Date()));
   const [note, setNote] = useState('');
   const [debtId, setDebtId] = useState(params.debtId ?? '');
-  const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly');
+  const [frequency, setFrequency] = useState<Routine['frequency']>('monthly');
+  const [repeatFrequency, setRepeatFrequency] = useState<'weekly' | 'monthly'>('monthly');
   const [remind, setRemind] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -52,8 +54,10 @@ export default function CatatanFormScreen() {
       setDueDate(existingDeposit.date);
     } else if (type === 'routine' && existingRoutine) {
       setTitle(existingRoutine.title);
+      setCategory(existingRoutine.category ?? 'other');
       setDueDate(existingRoutine.dueDate);
       setFrequency(existingRoutine.frequency);
+      if (existingRoutine.frequency !== 'once') setRepeatFrequency(existingRoutine.frequency);
       setRemind(existingRoutine.remind);
     }
   }, [params.id, type, loading, existingDebt, existingDeposit, existingRoutine]);
@@ -68,7 +72,7 @@ export default function CatatanFormScreen() {
   const amountValid = Number.isSafeInteger(amountValue) && amountValue > 0;
   const dateLabel = type === 'deposit' ? 'Tanggal setoran' : 'Jatuh tempo';
   const isEditing = Boolean(params.id);
-  const heading = type === 'debt' ? 'utang' : type === 'deposit' ? 'setoran' : 'pengeluaran rutin';
+  const heading = type === 'debt' ? 'utang' : type === 'deposit' ? 'setoran' : 'pengeluaran';
 
   const toggleReminder = async (value: boolean) => {
     setFormError(null);
@@ -112,7 +116,7 @@ export default function CatatanFormScreen() {
       } else if (type === 'deposit') {
         await saveDeposit({ ...(existingDeposit ? { id: existingDeposit.id } : {}), debtId, amount: amountValue, date: dueDate, note: note.trim() });
       } else {
-        await saveRoutine({ ...(existingRoutine ? { id: existingRoutine.id } : {}), title: title.trim(), amount: amountValue, dueDate, frequency, note: note.trim(), remind: Platform.OS !== 'web' && remind });
+        await saveRoutine({ ...(existingRoutine ? { id: existingRoutine.id } : {}), title: title.trim(), category, amount: amountValue, dueDate, frequency, note: note.trim(), remind: Platform.OS !== 'web' && remind });
       }
       router.replace('/catatan');
     } catch (cause) {
@@ -208,10 +212,10 @@ export default function CatatanFormScreen() {
         )}
 
         <LinearGradient colors={[colors.primaryGlass, colors.primaryGlassDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.amountCard, { borderColor: colors.border }]}>
-          <Text style={[styles.amountEyebrow, { color: colors.primaryForeground }]}>{type === 'deposit' ? 'JUMLAH SETORAN' : type === 'routine' ? 'NOMINAL PER PERIODE' : 'TOTAL UTANG'}</Text>
+          <Text style={[styles.amountEyebrow, { color: colors.primaryForeground }]}>{type === 'deposit' ? 'JUMLAH SETORAN' : type === 'routine' ? frequency === 'once' ? 'NOMINAL PENGELUARAN' : 'NOMINAL PER PERIODE' : 'TOTAL UTANG'}</Text>
           <View style={styles.amountRow}>
             <Text style={[styles.amountPrefix, { color: colors.primaryForeground }]}>Rp</Text>
-            <TextInput accessibilityLabel="Nominal" value={amount} onChangeText={text => setAmount(text.replace(/\D/g, ''))} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.primaryForeground} maxLength={15} style={[styles.amountInput, { color: colors.primaryForeground }]} testID="note-amount" />
+            <TextInput accessibilityLabel="Nominal" value={formatRupiahInput(amount)} onChangeText={text => setAmount(normalizeRupiahInput(text))} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.primaryForeground} maxLength={19} style={[styles.amountInput, { color: colors.primaryForeground }]} testID="note-amount" />
           </View>
           {amountValid && <Text style={[styles.amountPreview, { color: colors.primaryForeground }]}>{formatRupiah(amountValue)}{type === 'deposit' ? ` · tersedia ${formatRupiah(Math.max(available, 0))}` : ''}</Text>}
         </LinearGradient>
@@ -220,17 +224,53 @@ export default function CatatanFormScreen() {
         {type === 'routine' && field('Nama pengeluaran', title, setTitle, 'Contoh: Belanja mingguan', 'edit-3')}
         {type === 'routine' && (
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.foreground }]}>Berulang setiap</Text>
-            <View style={styles.choiceRow}>
-              {([['weekly', 'Minggu'], ['monthly', 'Bulan']] as const).map(([value, label]) => (
-                <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: frequency === value }} onPress={() => setFrequency(value)}
-                  style={[styles.choice, { backgroundColor: frequency === value ? colors.secondary : colors.card, borderColor: frequency === value ? colors.primary : colors.border }]}>
-                  <Feather name={value === 'weekly' ? 'repeat' : 'calendar'} size={16} color={frequency === value ? colors.primary : colors.mutedForeground} />
-                  <Text style={[styles.choiceText, { color: frequency === value ? colors.primary : colors.foreground }]}>{label}</Text>
-                </Pressable>
-              ))}
+            <Text style={[styles.label, { color: colors.foreground }]}>Kategori</Text>
+            <View style={styles.categoryGrid}>
+              {BILL_CATEGORIES.map(item => {
+                const selected = category === item.id;
+                return (
+                  <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setCategory(item.id)}
+                    style={[styles.categoryChoice, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
+                    <Feather name={item.icon} size={15} color={selected ? colors.primary : colors.mutedForeground} />
+                    <Text style={[styles.categoryText, { color: selected ? colors.primary : colors.mutedForeground }]}>{item.label}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            <Text style={[styles.hint, { color: colors.mutedForeground }]}>Tanggal berikutnya dibuat setelah kamu mengonfirmasi pembayaran.</Text>
+          </View>
+        )}
+        {type === 'routine' && (
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.foreground }]}>Jenis pengeluaran</Text>
+            <View style={styles.choiceRow}>
+              {([['once', 'Sekali bayar', 'check-circle'], ['repeat', 'Berulang setiap', 'repeat']] as const).map(([value, label, icon]) => {
+                const selected = value === 'once' ? frequency === 'once' : frequency !== 'once';
+                return (
+                  <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setFrequency(value === 'once' ? 'once' : repeatFrequency)}
+                    style={[styles.choice, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
+                    <Feather name={icon} size={16} color={selected ? colors.primary : colors.mutedForeground} />
+                    <Text style={[styles.choiceText, { color: selected ? colors.primary : colors.foreground }]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {frequency !== 'once' && (
+              <>
+                <Text style={[styles.label, { color: colors.foreground, marginTop: 7 }]}>Periode pengulangan</Text>
+                <View style={styles.choiceRow}>
+                  {([['weekly', 'Minggu'], ['monthly', 'Bulan']] as const).map(([value, label]) => (
+                    <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: frequency === value }} onPress={() => { setFrequency(value); setRepeatFrequency(value); }}
+                      style={[styles.choice, { backgroundColor: frequency === value ? colors.secondary : colors.card, borderColor: frequency === value ? colors.primary : colors.border }]}>
+                      <Feather name={value === 'weekly' ? 'repeat' : 'calendar'} size={16} color={frequency === value ? colors.primary : colors.mutedForeground} />
+                      <Text style={[styles.choiceText, { color: frequency === value ? colors.primary : colors.foreground }]}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
+            <Text style={[styles.hint, { color: colors.mutedForeground }]}>{frequency === 'once'
+              ? 'Setelah dibayar, pengeluaran masuk riwayat dan tidak muncul lagi.'
+              : 'Tanggal berikutnya dibuat setelah kamu mengonfirmasi pembayaran.'}</Text>
           </View>
         )}
         <View style={styles.field}>
@@ -278,11 +318,14 @@ const styles = StyleSheet.create({
   field: { gap: 9 }, label: { fontFamily: 'Inter_600SemiBold', fontSize: 13 }, hint: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17 },
   choiceRow: { flexDirection: 'row', gap: 9 }, choice: { flex: 1, minHeight: 49, borderWidth: 1, borderRadius: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 7 },
   choiceText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 }, debtChoice: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  categoryChoice: { minWidth: '30%', flexGrow: 1, flexBasis: '30%', minHeight: 43, borderRadius: 7, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 8 },
+  categoryText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   info: { borderWidth: 1, borderRadius: 7, padding: 14, gap: 9 }, link: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   amountCard: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 19, paddingVertical: 18, overflow: 'hidden' },
   amountEyebrow: { fontFamily: 'Inter_600SemiBold', letterSpacing: 1, fontSize: 10, opacity: 0.8 },
   amountRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 }, amountPrefix: { fontFamily: 'Inter_600SemiBold', fontSize: 23, marginRight: 9 },
-  amountInput: { flex: 1, padding: 0, fontFamily: 'Inter_700Bold', fontSize: 34, letterSpacing: -1 }, amountPreview: { fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 4, opacity: 0.78 },
+  amountInput: { flex: 1, minWidth: 0, padding: 0, fontFamily: 'Inter_700Bold', fontSize: 34, letterSpacing: -1 }, amountPreview: { fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 4, opacity: 0.78 },
   inputShell: { minHeight: 49, borderWidth: 1, borderRadius: 7, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
   input: { flex: 1, paddingVertical: 11, fontFamily: 'Inter_400Regular', fontSize: 13 },
   datePreview: { fontFamily: 'Inter_500Medium', fontSize: 11 }, presets: { flexDirection: 'row', gap: 8 }, preset: { flex: 1, borderWidth: 1, borderRadius: 6, paddingVertical: 8, alignItems: 'center' },

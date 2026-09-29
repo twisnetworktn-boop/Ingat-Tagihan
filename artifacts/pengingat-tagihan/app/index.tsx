@@ -229,7 +229,7 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Tagihan kamu</Text>
+      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Ayo Tagih</Text>
       <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
         Biar semua jatuh tempo tetap terpantau.
       </Text>
