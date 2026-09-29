@@ -10,7 +10,7 @@ import { useNotes, type Debt, type Deposit, type Routine, type RoutinePayment } 
 import { useColors } from '@/hooks/useColors';
 import { formatDateInput, formatRupiah, getLocalDateString, getNextMonthlyDueDate } from '@/lib/bill-format';
 
-type Section = 'debt' | 'deposit' | 'routine';
+type Section = 'debt' | 'routine';
 type Palette = ReturnType<typeof useColors>;
 
 function confirmAction(title: string, message: string, action: string, destructive: boolean, onConfirm: () => void) {
@@ -178,7 +178,7 @@ export default function CatatanScreen() {
   };
   const navigate = (type: 'debt' | 'deposit' | 'routine', id?: string, debtId?: string) => router.push({ pathname: '/catatan-form', params: { type, ...(id ? { id } : {}), ...(debtId ? { debtId } : {}) } });
   const refresh = async () => { setRefreshing(true); try { await reload(); } catch (cause) { showError(cause); } finally { setRefreshing(false); } };
-  const empty = section === 'debt' ? debts.length === 0 : section === 'deposit' ? deposits.length === 0 : routines.length === 0;
+  const empty = section === 'debt' ? debts.length === 0 : routines.length === 0;
 
   const renderGroup = (title: string, subtitle: string, list: Debt[]) => (
     <View style={styles.group}>
@@ -224,7 +224,7 @@ export default function CatatanScreen() {
         </LinearGradient>
 
         <View style={styles.sectionTabs}>
-          {([['debt', 'Hutang', 'users'], ['deposit', 'Setoran', 'credit-card'], ['routine', 'Biaya rutin', 'repeat']] as const).map(([key, label, icon]) => (
+          {([['debt', 'Hutang', 'users'], ['routine', 'Biaya rutin', 'repeat']] as const).map(([key, label, icon]) => (
             <Pressable key={key} accessibilityRole="tab" accessibilityState={{ selected: section === key }} onPress={() => setSection(key)}
               style={[styles.sectionTab, { backgroundColor: section === key ? colors.action : colors.card, borderColor: section === key ? colors.action : colors.border }]}>
               <Feather name={icon} size={14} color={section === key ? colors.actionForeground : colors.mutedForeground} />
@@ -254,11 +254,11 @@ export default function CatatanScreen() {
         ) : empty ? (
           <>
             <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}><Feather name={section === 'debt' ? 'book-open' : section === 'deposit' ? 'credit-card' : 'repeat'} size={25} color={colors.primary} /></View>
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{section === 'debt' ? 'Mulai dari satu catatan' : section === 'deposit' ? 'Belum ada setoran' : 'Belum ada pengeluaran rutin'}</Text>
-              <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>{section === 'debt' ? 'Catat siapa dan berapa, lalu kurangi saldonya setiap kali ada setoran.' : section === 'deposit' ? openDebts.length > 0 ? 'Setoran yang kamu catat untuk utang dan piutang akan tersimpan di sini.' : 'Untuk mencatat setoran, buat dulu catatan hutang yang masih memiliki sisa saldo.' : 'Catat pengeluaran yang kembali tiap minggu atau bulan. Riwayat bayar akan tersimpan.'}</Text>
-              <Pressable onPress={() => navigate(section === 'deposit' && openDebts.length === 0 ? 'debt' : section)} style={[styles.emptyButton, { backgroundColor: colors.action }]}>
-                <Feather name="plus" size={16} color={colors.actionForeground} /><Text style={[styles.emptyButtonText, { color: colors.actionForeground }]}>Tambah {section === 'debt' ? 'hutang' : section === 'deposit' ? openDebts.length > 0 ? 'setoran' : 'hutang dulu' : 'pengeluaran'}</Text>
+              <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}><Feather name={section === 'debt' ? 'book-open' : 'repeat'} size={25} color={colors.primary} /></View>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{section === 'debt' ? 'Mulai dari satu catatan' : 'Belum ada pengeluaran rutin'}</Text>
+              <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>{section === 'debt' ? 'Catat siapa dan berapa, lalu kurangi saldonya setiap kali ada setoran.' : 'Catat pengeluaran yang kembali tiap minggu atau bulan. Riwayat bayar akan tersimpan.'}</Text>
+              <Pressable onPress={() => navigate(section)} style={[styles.emptyButton, { backgroundColor: colors.action }]}>
+                <Feather name="plus" size={16} color={colors.actionForeground} /><Text style={[styles.emptyButtonText, { color: colors.actionForeground }]}>Tambah {section === 'debt' ? 'hutang' : 'pengeluaran'}</Text>
               </Pressable>
             </View>
             {section === 'routine' && routinePayments.length > 0 && (
@@ -282,53 +282,6 @@ export default function CatatanScreen() {
               </Pressable>
             )}
           </>
-        ) : section === 'deposit' ? (
-          <View style={styles.group}>
-            <View style={styles.groupHeading}>
-              <View>
-                <Text style={[styles.groupTitle, { color: colors.foreground }]}>Semua setoran</Text>
-                <Text style={[styles.groupSub, { color: colors.mutedForeground }]}>Pembayaran utang dan piutang yang sudah dicatat</Text>
-              </View>
-              <Text style={[styles.groupCount, { color: colors.primary }]}>{deposits.length}</Text>
-            </View>
-            {openDebts.length === 0 && (
-              <View style={[styles.depositNotice, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                <Feather name="info" size={17} color={colors.primary} />
-                <View style={styles.depositNoticeCopy}>
-                  <Text style={[styles.depositNoticeTitle, { color: colors.foreground }]}>Belum ada hutang dengan sisa saldo</Text>
-                  <Text style={[styles.depositNoticeBody, { color: colors.mutedForeground }]}>Setoran baru memerlukan hutang yang belum lunas. Catatan lama tetap bisa kamu lihat di bawah.</Text>
-                  <Pressable accessibilityRole="button" onPress={() => navigate('debt')} style={styles.noticeLink}>
-                    <Text style={[styles.inlineAddText, { color: colors.action }]}>Buat catatan hutang</Text>
-                    <Feather name="arrow-right" size={14} color={colors.action} />
-                  </Pressable>
-                </View>
-              </View>
-            )}
-            {[...deposits].sort((a, b) => b.date.localeCompare(a.date)).map(deposit => {
-              const debt = debts.find(x => x.id === deposit.debtId);
-              return (
-                <View key={deposit.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={styles.cardTop}>
-                    <View style={[styles.cardIcon, { backgroundColor: colors.actionSoft }]}><Feather name="arrow-down-left" size={18} color={colors.action} /></View>
-                    <View style={styles.cardMain}>
-                      <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{debt?.person ?? 'Catatan hutang tidak tersedia'}</Text>
-                      <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{debt ? debt.direction === 'owe' ? 'Saya berutang' : 'Mereka berutang' : 'Setoran tersimpan tanpa catatan induk'}</Text>
-                    </View>
-                    {debt && <SmallAction icon="edit-2" label={`Ubah setoran ${formatRupiah(deposit.amount)}`} onPress={() => navigate('deposit', deposit.id)} colors={colors} />}
-                    <SmallAction icon="trash-2" label={`Hapus setoran ${formatRupiah(deposit.amount)}`} onPress={() => removeDeposit(deposit)} colors={colors} danger />
-                  </View>
-                  <View style={styles.balanceRow}>
-                    <View>
-                      <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>JUMLAH SETORAN</Text>
-                      <Text style={[styles.balance, { color: colors.foreground }]}>{formatRupiah(deposit.amount)}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.dueRow}><Feather name="calendar" size={13} color={colors.primary} /><Text style={[styles.dueText, { color: colors.primary }]}>{formatDateInput(deposit.date) || deposit.date}</Text></View>
-                  {deposit.note ? <Text style={[styles.note, { color: colors.mutedForeground }]}>{deposit.note}</Text> : null}
-                </View>
-              );
-            })}
-          </View>
         ) : (
           <View style={styles.group}>
             <View style={styles.groupHeading}><View><Text style={[styles.groupTitle, { color: colors.foreground }]}>Siklus berjalan</Text><Text style={[styles.groupSub, { color: colors.mutedForeground }]}>Konfirmasi saat sudah dibayar</Text></View><Text style={[styles.groupCount, { color: colors.primary }]}>{routines.length}</Text></View>
@@ -349,10 +302,10 @@ export default function CatatanScreen() {
           </View>
         )}
       </ScrollView>
-      {!loading && !(error && debts.length === 0 && deposits.length === 0 && routines.length === 0) && !empty && (section !== 'deposit' || openDebts.length > 0) && (
-        <Pressable accessibilityRole="button" accessibilityLabel={section === 'debt' ? 'Tambah hutang' : section === 'deposit' ? 'Tambah setoran' : 'Tambah biaya rutin'} onPress={() => navigate(section)}
+      {!loading && !(error && debts.length === 0 && deposits.length === 0 && routines.length === 0) && !empty && (
+        <Pressable accessibilityRole="button" accessibilityLabel={section === 'debt' ? 'Tambah hutang' : 'Tambah biaya rutin'} onPress={() => navigate(section)}
           style={({ pressed }) => [styles.fab, { backgroundColor: colors.action, bottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 18 }, pressed && styles.pressed]}>
-          <Feather name="plus" size={19} color={colors.actionForeground} /><Text style={[styles.fabText, { color: colors.actionForeground }]}>Tambah {section === 'debt' ? 'hutang' : section === 'deposit' ? 'setoran' : 'rutin'}</Text>
+          <Feather name="plus" size={19} color={colors.actionForeground} /><Text style={[styles.fabText, { color: colors.actionForeground }]}>Tambah {section === 'debt' ? 'hutang' : 'rutin'}</Text>
         </Pressable>
       )}
     </View>
@@ -393,10 +346,6 @@ const styles = StyleSheet.create({
   quietRow: { borderWidth: 1, borderRadius: 8, padding: 17 }, quietText: { fontFamily: 'Inter_400Regular', fontSize: 12 },
   secondaryAction: { height: 46, borderWidth: 1, borderRadius: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginBottom: 15 },
   secondaryActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
-  depositNotice: { borderWidth: 1, borderRadius: 8, padding: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 11, marginBottom: 3 },
-  depositNoticeCopy: { flex: 1 }, depositNoticeTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
-  depositNoticeBody: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17, marginTop: 5 },
-  noticeLink: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: 10 },
   archive: { borderWidth: 1, borderRadius: 9, padding: 16, marginTop: 6 },
   empty: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 22, paddingVertical: 30, alignItems: 'center', marginTop: 5 },
   emptyIcon: { height: 55, width: 55, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
