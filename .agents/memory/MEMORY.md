@@ -1,1 +1,2 @@
 - [GitHub connector pushes](github-connector-pushes.md) — connector auth covers GitHub REST, not shell Git; empty repositories require initialization before Git Data API writes.
+- [Workspace dependency installs](workspace-dependency-installs.md) — generic package installer cannot target this pnpm artifact; use a package-scoped install when needed.

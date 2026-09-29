@@ -188,6 +188,7 @@ export function BillsProvider({ children }: { children: ReactNode }) {
   const saveBill = useCallback((input: BillInput) => enqueue(async () => {
     const previous = input.id ? billsRef.current.find((bill) => bill.id === input.id) : undefined;
     if (input.id && !previous) throw new Error('Tagihan tidak ditemukan. Buka ulang daftar tagihan.');
+    if (previous?.isPaid) throw new Error('Tagihan lunas tersimpan sebagai riwayat dan tidak dapat diubah.');
     const id = input.id ?? createBillId();
     const nextBill: Bill = {
       ...input,

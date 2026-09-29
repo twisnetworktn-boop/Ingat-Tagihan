@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { Platform } from 'react-native';
 import { ensureReminderPermission, type BillCategory } from '@/contexts/BillsContext';
 import { formatRupiah, getNextExpenseDueDate, isValidBillDate } from '@/lib/bill-format';
+import { removeStoredPhoto, storePhoto, type PhotoDraft } from '@/lib/photo-attachments';
 
 const STORAGE_KEY = '@ingat-tagihan/notes/v1';
 const ANDROID_CHANNEL_ID = 'bill-reminders';
@@ -15,6 +16,7 @@ export type Debt = {
   amount: number;
   dueDate: string;
   note: string;
+  photoUri?: string;
   remind: boolean;
   notificationId?: string;
 };
@@ -48,9 +50,12 @@ export type RoutinePayment = {
   dueDate: string;
   paidAt: string;
   category?: BillCategory;
+  note?: string;
+  frequency?: Routine['frequency'];
+  receiptUri?: string;
 };
 
-type DebtInput = Omit<Debt, 'id' | 'notificationId'> & { id?: string };
+type DebtInput = Omit<Debt, 'id' | 'notificationId' | 'photoUri'> & { id?: string; photo?: PhotoDraft | null };
 type DepositInput = Omit<Deposit, 'id'> & { id?: string };
 type RoutineInput = Omit<Routine, 'id' | 'anchorDay' | 'notificationId' | 'category'> & { id?: string; category: BillCategory };
 type NotesData = {
@@ -69,7 +74,7 @@ type NotesContextValue = NotesData & {
   deleteDeposit: (id: string) => Promise<void>;
   saveRoutine: (input: RoutineInput) => Promise<string>;
   deleteRoutine: (id: string) => Promise<void>;
-  payRoutine: (id: string) => Promise<void>;
+  payRoutine: (id: string, receipt?: PhotoDraft) => Promise<void>;
 };
 
 const EMPTY_DATA: NotesData = { debts: [], deposits: [], routines: [], routinePayments: [] };
@@ -184,7 +189,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     if (input.amount < totalDeposited(id, current.deposits)) {
       throw new Error('Nominal hutang tidak boleh lebih kecil dari total setoran.');
     }
-    const debt: Debt = { ...input, id, person: input.person.trim(), notificationId: undefined };
+    const { photo, ...fields } = input;
+    const storedPhoto = photo ? await storePhoto(photo) : undefined;
+    const debt: Debt = {
+      ...fields, id, person: input.person.trim(),
+      photoUri: photo === undefined ? previous?.photoUri : storedPhoto,
+      notificationId: undefined,
+    };
     let warning: string | null = null;
     if (totalDeposited(id, current.deposits) < debt.amount) {
       try { debt.notificationId = await scheduleReminder('debt', debt); }
@@ -197,7 +208,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       });
     } catch (cause) {
       await cancelReminder(debt.notificationId).catch(() => undefined);
+      removeStoredPhoto(storedPhoto);
       throw cause;
+    }
+    if (previous?.photoUri && previous.photoUri !== debt.photoUri) {
+      try { removeStoredPhoto(previous.photoUri); }
+      catch { warning = 'Catatan tersimpan, tetapi foto lama belum bisa dibersihkan.'; }
     }
     if (previous?.notificationId) {
       await cancelReminder(previous.notificationId).catch(() => {
@@ -217,6 +233,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       debts: current.debts.filter((item) => item.id !== id),
       deposits: current.deposits.filter((item) => item.debtId !== id),
     });
+    try { removeStoredPhoto(debt.photoUri); }
+    catch { setError('Catatan dihapus, tetapi foto lama belum bisa dibersihkan.'); }
     await cancelReminder(debt.notificationId).catch(() => setError('Catatan dihapus, tetapi pengingat lama belum bisa dibatalkan.'));
   }), [enqueue, persist]);
 
@@ -333,10 +351,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     await cancelReminder(routine.notificationId).catch(() => setError('Biaya dihapus, tetapi pengingat lama belum bisa dibatalkan.'));
   }), [enqueue, persist]);
 
-  const payRoutine = useCallback((id: string) => enqueue(async () => {
+  const payRoutine = useCallback((id: string, receipt?: PhotoDraft) => enqueue(async () => {
     const current = dataRef.current;
     const routine = current.routines.find((item) => item.id === id);
     if (!routine) throw new Error('Pengeluaran tidak ditemukan.');
+    const receiptUri = receipt ? await storePhoto(receipt) : undefined;
     const payment: RoutinePayment = {
       id: createId(),
       routineId: id,
@@ -345,6 +364,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       dueDate: routine.dueDate,
       paidAt: new Date().toISOString(),
       category: routine.category ?? 'other',
+      note: routine.note,
+      frequency: routine.frequency,
+      receiptUri,
     };
     const nextDueDate = getNextExpenseDueDate(routine.frequency, routine.dueDate, routine.anchorDay);
     const nextRoutine: Routine | null = nextDueDate
@@ -365,6 +387,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       });
     } catch (cause) {
       await cancelReminder(nextRoutine?.notificationId).catch(() => undefined);
+      removeStoredPhoto(receiptUri);
       throw cause;
     }
     if (routine.notificationId) {

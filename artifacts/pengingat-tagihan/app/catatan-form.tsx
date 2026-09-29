@@ -5,11 +5,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
+import { PhotoPickerField } from '@/components/PhotoAttachment';
 import { SurfaceBackground } from '@/components/SurfaceBackground';
 import { BILL_CATEGORIES, ensureReminderPermission, type BillCategory } from '@/contexts/BillsContext';
 import { useNotes, type Debt, type Routine } from '@/contexts/NotesContext';
 import { useColors } from '@/hooks/useColors';
 import { formatDateInput, formatRupiah, formatRupiahInput, getLocalDateString, isValidBillDate, normalizeRupiahInput } from '@/lib/bill-format';
+import type { PhotoDraft } from '@/lib/photo-attachments';
 
 type RecordType = 'debt' | 'deposit' | 'routine';
 
@@ -30,6 +32,7 @@ export default function CatatanFormScreen() {
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState(getLocalDateString(new Date()));
   const [note, setNote] = useState('');
+  const [photoChange, setPhotoChange] = useState<PhotoDraft | null | undefined>(undefined);
   const [debtId, setDebtId] = useState(params.debtId ?? '');
   const [frequency, setFrequency] = useState<Routine['frequency']>('monthly');
   const [repeatFrequency, setRepeatFrequency] = useState<'weekly' | 'monthly'>('monthly');
@@ -45,6 +48,7 @@ export default function CatatanFormScreen() {
     setAmount(String(record.amount));
     setNote(record.note);
     if (type === 'debt' && existingDebt) {
+      setPhotoChange(undefined);
       setPerson(existingDebt.person);
       setDirection(existingDebt.direction);
       setDueDate(existingDebt.dueDate);
@@ -112,7 +116,7 @@ export default function CatatanFormScreen() {
     setSaving(true);
     try {
       if (type === 'debt') {
-        await saveDebt({ ...(existingDebt ? { id: existingDebt.id } : {}), direction, person: person.trim(), amount: amountValue, dueDate, note: note.trim(), remind: Platform.OS !== 'web' && remind });
+        await saveDebt({ ...(existingDebt ? { id: existingDebt.id } : {}), direction, person: person.trim(), amount: amountValue, dueDate, note: note.trim(), photo: photoChange, remind: Platform.OS !== 'web' && remind });
       } else if (type === 'deposit') {
         await saveDeposit({ ...(existingDeposit ? { id: existingDeposit.id } : {}), debtId, amount: amountValue, date: dueDate, note: note.trim() });
       } else {
@@ -175,9 +179,9 @@ export default function CatatanFormScreen() {
             <View style={styles.choiceRow}>
               {([['owe', 'Saya berutang', 'arrow-up-right'], ['owed', 'Mereka berutang', 'arrow-down-left']] as const).map(([value, label, icon]) => (
                 <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: direction === value }} onPress={() => setDirection(value)}
-                  style={[styles.choice, { borderColor: direction === value ? colors.primary : colors.border, backgroundColor: direction === value ? colors.secondary : colors.card }]}>
-                  <Feather name={icon} size={16} color={direction === value ? colors.primary : colors.mutedForeground} />
-                  <Text style={[styles.choiceText, { color: direction === value ? colors.primary : colors.foreground }]}>{label}</Text>
+                  style={[styles.choice, { borderColor: direction === value ? colors.action : colors.border, backgroundColor: direction === value ? colors.actionSoft : colors.card }]}>
+                  <Feather name={icon} size={16} color={direction === value ? colors.action : colors.mutedForeground} />
+                  <Text style={[styles.choiceText, { color: direction === value ? colors.action : colors.foreground }]}>{label}</Text>
                 </Pressable>
               ))}
             </View>
@@ -230,9 +234,9 @@ export default function CatatanFormScreen() {
                 const selected = category === item.id;
                 return (
                   <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setCategory(item.id)}
-                    style={[styles.categoryChoice, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
-                    <Feather name={item.icon} size={15} color={selected ? colors.primary : colors.mutedForeground} />
-                    <Text style={[styles.categoryText, { color: selected ? colors.primary : colors.mutedForeground }]}>{item.label}</Text>
+                    style={[styles.categoryChoice, { backgroundColor: selected ? colors.actionSoft : colors.card, borderColor: selected ? colors.action : colors.border }]}>
+                    <Feather name={item.icon} size={15} color={selected ? colors.action : colors.mutedForeground} />
+                    <Text style={[styles.categoryText, { color: selected ? colors.action : colors.mutedForeground }]}>{item.label}</Text>
                   </Pressable>
                 );
               })}
@@ -247,9 +251,9 @@ export default function CatatanFormScreen() {
                 const selected = value === 'once' ? frequency === 'once' : frequency !== 'once';
                 return (
                   <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setFrequency(value === 'once' ? 'once' : repeatFrequency)}
-                    style={[styles.choice, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
-                    <Feather name={icon} size={16} color={selected ? colors.primary : colors.mutedForeground} />
-                    <Text style={[styles.choiceText, { color: selected ? colors.primary : colors.foreground }]}>{label}</Text>
+                    style={[styles.choice, { backgroundColor: selected ? colors.actionSoft : colors.card, borderColor: selected ? colors.action : colors.border }]}>
+                    <Feather name={icon} size={16} color={selected ? colors.action : colors.mutedForeground} />
+                    <Text style={[styles.choiceText, { color: selected ? colors.action : colors.foreground }]}>{label}</Text>
                   </Pressable>
                 );
               })}
@@ -260,9 +264,9 @@ export default function CatatanFormScreen() {
                 <View style={styles.choiceRow}>
                   {([['weekly', 'Minggu'], ['monthly', 'Bulan']] as const).map(([value, label]) => (
                     <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: frequency === value }} onPress={() => { setFrequency(value); setRepeatFrequency(value); }}
-                      style={[styles.choice, { backgroundColor: frequency === value ? colors.secondary : colors.card, borderColor: frequency === value ? colors.primary : colors.border }]}>
-                      <Feather name={value === 'weekly' ? 'repeat' : 'calendar'} size={16} color={frequency === value ? colors.primary : colors.mutedForeground} />
-                      <Text style={[styles.choiceText, { color: frequency === value ? colors.primary : colors.foreground }]}>{label}</Text>
+                      style={[styles.choice, { backgroundColor: frequency === value ? colors.actionSoft : colors.card, borderColor: frequency === value ? colors.action : colors.border }]}>
+                      <Feather name={value === 'weekly' ? 'repeat' : 'calendar'} size={16} color={frequency === value ? colors.action : colors.mutedForeground} />
+                      <Text style={[styles.choiceText, { color: frequency === value ? colors.action : colors.foreground }]}>{label}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -300,6 +304,9 @@ export default function CatatanFormScreen() {
             <TextInput accessibilityLabel="Catatan tambahan" multiline textAlignVertical="top" value={note} onChangeText={setNote} placeholder="Rincian kecil yang ingin diingat..." placeholderTextColor={colors.mutedForeground} maxLength={180} style={[styles.noteInput, { color: colors.foreground }]} />
           </View>
         </View>
+        {type === 'debt' && (
+          <PhotoPickerField label="Foto/bukti hutang" uri={photoChange === undefined ? existingDebt?.photoUri : photoChange?.uri} onChange={setPhotoChange} disabled={saving} />
+        )}
         {formError && <View style={[styles.errorBox, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={16} color={colors.accentForeground} /><Text style={[styles.errorText, { color: colors.accentForeground }]}>{formError}</Text></View>}
         <Pressable accessibilityRole="button" disabled={saving || (type === 'deposit' && openDebts.length === 0)} onPress={() => void submit()} style={({ pressed }) => [styles.save, { backgroundColor: colors.action, opacity: saving || (type === 'deposit' && openDebts.length === 0) ? 0.5 : pressed ? 0.78 : 1 }]}>
           <Feather name="check" size={17} color={colors.actionForeground} />

@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BILL_CATEGORIES, type Bill, useBills } from '@/contexts/BillsContext';
 import { SurfaceBackground } from '@/components/SurfaceBackground';
 import { TopMenu } from '@/components/TopMenu';
+import { TransactionSnapshot, type Snapshot } from '@/components/TransactionSnapshot';
 import { useColors } from '@/hooks/useColors';
 import { formatDateInput, formatDueLabel, formatRupiah, formatShortDate, getDaysUntilDue, getNextMonthlyDueDate, sortBills } from '@/lib/bill-format';
 
@@ -126,6 +127,7 @@ export default function HomeScreen() {
   const { bills, loading, error, reload, deleteBill, markPaid } = useBills();
   const [filter, setFilter] = useState<Filter>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [snapshotBillId, setSnapshotBillId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -151,6 +153,20 @@ export default function HomeScreen() {
     );
     return sortBills(filtered);
   }, [bills, filter]);
+  const snapshotBill = bills.find((bill) => bill.id === snapshotBillId && bill.isPaid);
+  const billSnapshot: Snapshot | null = snapshotBill ? {
+    title: snapshotBill.title,
+    subtitle: 'Tagihan lunas',
+    rows: [
+      { label: 'Status', value: 'Lunas' },
+      { label: 'Nominal', value: formatRupiah(snapshotBill.amount) },
+      { label: 'Kategori', value: (BILL_CATEGORIES.find(item => item.id === snapshotBill.category) ?? BILL_CATEGORIES[5]).label },
+      { label: 'Jenis', value: snapshotBill.repeat === 'once' ? 'Sekali bayar' : 'Bulanan' },
+      { label: 'Jatuh tempo', value: formatDateInput(snapshotBill.dueDate) },
+      { label: 'Dibayar', value: snapshotBill.paidAt ? formatDateInput(snapshotBill.paidAt.slice(0, 10)) : 'Tanggal tidak tercatat' },
+    ],
+    note: snapshotBill.note,
+  } : null;
 
   const removeBill = (bill: Bill) => {
     const message = bill.isPaid
@@ -201,34 +217,8 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const dateLabel = new Intl.DateTimeFormat('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(new Date());
-
   const header = (
     <View style={styles.headerContent}>
-      <View style={styles.topRow}>
-        <View>
-          <View style={styles.brandRow}>
-            <View style={[styles.brandMark, { backgroundColor: colors.primary }]}>
-              <Feather name="check" size={14} color={colors.primaryForeground} />
-            </View>
-            <Text style={[styles.brandName, { color: colors.foreground }]}>ingat</Text>
-          </View>
-          <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>{dateLabel}</Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Tambah tagihan"
-          onPress={() => router.push('/bill-form')}
-          style={({ pressed }) => [styles.headerAddButton, { backgroundColor: colors.actionSoft }, pressed && styles.pressed]}
-        >
-          <Feather name="plus" size={20} color={colors.action} />
-        </Pressable>
-      </View>
-
       <Text style={[styles.pageTitle, { color: colors.foreground }]}>Ayo Tagih</Text>
       <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
         Biar semua jatuh tempo tetap terpantau.
@@ -378,7 +368,7 @@ export default function HomeScreen() {
         renderItem={({ item }) => (
           <BillCard
             bill={item}
-            onOpen={() => router.push({ pathname: '/bill-form', params: { id: item.id } })}
+            onOpen={() => item.isPaid ? setSnapshotBillId(item.id) : router.push({ pathname: '/bill-form', params: { id: item.id } })}
             onMarkPaid={() => changePaid(item)}
             onDelete={() => removeBill(item)}
           />
@@ -410,6 +400,7 @@ export default function HomeScreen() {
           <Text style={[styles.floatingButtonText, { color: colors.actionForeground }]}>Tambah tagihan</Text>
         </Pressable>
       ) : null}
+      <TransactionSnapshot snapshot={billSnapshot} onClose={() => setSnapshotBillId(null)} />
     </View>
   );
 }
@@ -420,12 +411,6 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   listContent: { paddingHorizontal: 20 },
   headerContent: { paddingBottom: 21 },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  brandMark: { width: 22, height: 22, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  brandName: { fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: -0.7 },
-  dateLabel: { marginTop: 5, fontFamily: 'Inter_500Medium', fontSize: 11, textTransform: 'capitalize' },
-  headerAddButton: { width: 42, height: 42, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   pageTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, letterSpacing: -1.1 },
   pageSubtitle: { marginTop: 6, marginBottom: 21, fontFamily: 'Inter_400Regular', fontSize: 14 },
   summaryCard: { marginTop: 22, borderRadius: 10, borderWidth: 1, paddingHorizontal: 20, paddingVertical: 19, overflow: 'hidden' },

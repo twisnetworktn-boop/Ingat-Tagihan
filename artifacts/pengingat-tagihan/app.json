@@ -8,7 +8,7 @@
     "scheme": "pengingat-tagihan",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "backgroundColor": "#f5f1fc"
+      "backgroundColor": "#F3F8FF"
     },
     "ios": {
       "supportsTablet": false
@@ -16,13 +16,22 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#6540ac"
+        "backgroundColor": "#49108B"
       }
     },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Izinkan Ingat Tagihan memilih foto bukti untuk catatan hutang dan pembayaran.",
+          "cameraPermission": "Izinkan Ingat Tagihan mengambil foto bukti untuk catatan hutang dan pembayaran."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
