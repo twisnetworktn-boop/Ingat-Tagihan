@@ -14,6 +14,7 @@
       "supportsTablet": false
     },
     "android": {
+      "package": "app.pengingattagihan.com",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#49108B"
