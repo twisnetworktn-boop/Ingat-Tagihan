@@ -107,6 +107,10 @@ export default function BillFormScreen() {
       setFormError('Nama orang perlu diisi.');
       return;
     }
+    if (!note.trim()) {
+      setFormError('Pasal atau keterangan yang ditagih perlu diisi.');
+      return;
+    }
     if (!amountValid) {
       setFormError('Masukkan nominal tagihan yang lebih dari nol.');
       return;
@@ -225,13 +229,13 @@ export default function BillFormScreen() {
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: colors.foreground }]}>Catatan/Keterangan <Text style={{ color: colors.mutedForeground }}>(opsional)</Text></Text>
+          <Text style={[styles.label, { color: colors.foreground }]}>Pasal / Yang Ditagih</Text>
           <View style={[styles.noteShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TextInput
-              accessibilityLabel="Catatan/Keterangan"
+              accessibilityLabel="Pasal atau yang ditagih"
               value={note}
               onChangeText={setNote}
-              placeholder="Tambahkan keterangan tagihan..."
+              placeholder="Contoh: Pinjaman pupuk, cicilan barang, biaya angkut"
               placeholderTextColor={colors.mutedForeground}
               multiline
               maxLength={180}
@@ -240,6 +244,7 @@ export default function BillFormScreen() {
               testID="bill-note"
             />
           </View>
+          <Text style={[styles.recurrenceNote, { color: colors.mutedForeground }]}>Wajib diisi agar jelas apa yang ditagihkan kepada orang tersebut.</Text>
         </View>
 
         <View style={styles.fieldGroup}>

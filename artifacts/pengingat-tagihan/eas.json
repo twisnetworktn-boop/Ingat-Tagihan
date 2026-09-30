@@ -1,7 +1,11 @@
 {
   "build": {
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "pnpm": "10.33.3",
+      "android": {
+        "buildType": "apk"
+      }
     }
   }
 }

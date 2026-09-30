@@ -108,7 +108,7 @@ function DebtCard({ debt, deposits, colors, onEdit, onDelete, onAddDeposit, onEd
           </View>
           {settled && <Feather name="chevron-right" size={17} color={colors.action} />}
         </Pressable>
-        {!settled && <SmallAction icon="edit-2" label={`Ubah utang ${debt.person}`} onPress={onEdit} colors={colors} />}
+        <SmallAction icon="edit-2" label={`Ubah utang ${debt.person}`} onPress={onEdit} colors={colors} />
         <SmallAction icon="trash-2" label={`Hapus utang ${debt.person}`} onPress={onDelete} colors={colors} danger />
       </View>
       <View style={styles.balanceRow}>
@@ -148,36 +148,45 @@ function DebtCard({ debt, deposits, colors, onEdit, onDelete, onAddDeposit, onEd
             <Text style={[styles.depositAmount, { color: colors.foreground }]}>{formatRupiah(deposit.amount)}</Text>
             <Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>{formatDateInput(deposit.date)}{deposit.note ? ` · ${deposit.note}` : ''}</Text>
           </View>
-          {!settled && <Pressable accessibilityRole="button" accessibilityLabel={`Ubah setoran ${formatRupiah(deposit.amount)}`} onPress={() => onEditDeposit(deposit)} hitSlop={8} style={styles.rowIcon}><Feather name="edit-2" size={14} color={colors.mutedForeground} /></Pressable>}
-          {!settled && <Pressable accessibilityRole="button" accessibilityLabel={`Hapus setoran ${formatRupiah(deposit.amount)}`} onPress={() => onDeleteDeposit(deposit)} hitSlop={8} style={styles.rowIcon}><Feather name="trash-2" size={14} color={colors.destructive} /></Pressable>}
+          <Pressable accessibilityRole="button" accessibilityLabel={`Ubah setoran ${formatRupiah(deposit.amount)}`} onPress={() => onEditDeposit(deposit)} hitSlop={8} style={styles.rowIcon}><Feather name="edit-2" size={14} color={colors.mutedForeground} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Hapus setoran ${formatRupiah(deposit.amount)}`} onPress={() => onDeleteDeposit(deposit)} hitSlop={8} style={styles.rowIcon}><Feather name="trash-2" size={14} color={colors.destructive} /></Pressable>
         </View>
       ))}
     </View>
   );
 }
 
-function PaymentHistoryRow({ payment, colors, onOpen, showTitle = false }: {
-  payment: RoutinePayment; colors: Palette; onOpen: () => void; showTitle?: boolean;
+function PaymentHistoryRow({ payment, colors, onOpen, onUndo, showTitle = false }: {
+  payment: RoutinePayment; colors: Palette; onOpen: () => void; onUndo?: () => void; showTitle?: boolean;
 }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`Lihat snapshot pembayaran ${payment.title}`} onPress={onOpen} style={[styles.depositLine, { borderTopColor: colors.border }]}>
+    <View style={[styles.depositLine, { borderTopColor: colors.border }]}>
       <View style={[styles.depositDot, { backgroundColor: colors.actionSoft }]}><Feather name="check" size={13} color={colors.action} /></View>
-      <View style={styles.depositCopy}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Lihat snapshot pembayaran ${payment.title}`} onPress={onOpen} style={styles.depositCopy}>
         <Text style={[styles.depositAmount, { color: colors.foreground }]}>{showTitle ? `${payment.title} · ` : ''}{formatRupiah(payment.amount)}</Text>
         <Text style={[styles.depositMeta, { color: colors.mutedForeground }]}>{expenseCategory(payment.category).label} · Jatuh tempo {formatDateInput(payment.dueDate)} · Dibayar {formatDateInput(payment.paidAt.slice(0, 10))}{payment.receiptUri ? ' · Ada nota' : ''}</Text>
-      </View>
-      <Feather name="chevron-right" size={17} color={colors.action} />
-    </Pressable>
+      </Pressable>
+      {onUndo ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`Batalkan pembayaran ${payment.title}`} onPress={onUndo} hitSlop={8} style={styles.rowIcon}>
+          <Feather name="rotate-ccw" size={14} color={colors.action} />
+        </Pressable>
+      ) : null}
+      <Pressable accessibilityRole="button" accessibilityLabel={`Buka pembayaran ${payment.title}`} onPress={onOpen} hitSlop={8} style={styles.rowIcon}>
+        <Feather name="chevron-right" size={17} color={colors.action} />
+      </Pressable>
+    </View>
   );
 }
 
-function RoutineCard({ routine, payments, colors, onEdit, onDelete, onPay, onOpenPayment }: {
-  routine: Routine; payments: RoutinePayment[]; colors: Palette; onEdit: () => void; onDelete: () => void; onPay: () => void; onOpenPayment: (payment: RoutinePayment) => void;
+function RoutineCard({ routine, payments, colors, onEdit, onDelete, onPay, onOpenPayment, onUndoPayment }: {
+  routine: Routine; payments: RoutinePayment[]; colors: Palette; onEdit: () => void; onDelete: () => void; onPay: () => void;
+  onOpenPayment: (payment: RoutinePayment) => void; onUndoPayment: (payment: RoutinePayment) => void;
 }) {
   const category = expenseCategory(routine.category);
   const due = routine.dueDate < getLocalDateString(new Date())
     ? 'Lewat jatuh tempo'
     : `${routine.frequency === 'once' ? 'Jatuh tempo' : 'Berikutnya'} ${formatDateInput(routine.dueDate)}`;
+  const sortedPayments = [...payments].sort((a, b) => b.paidAt.localeCompare(a.paidAt));
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.cardTop}>
@@ -206,8 +215,14 @@ function RoutineCard({ routine, payments, colors, onEdit, onDelete, onPay, onOpe
       <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pembayaran <Text style={{ color: colors.mutedForeground }}>({payments.length})</Text></Text>
       {payments.length === 0 ? (
         <Text style={[styles.depositEmpty, { color: colors.mutedForeground }]}>Belum ada pembayaran. Konfirmasi setelah pengeluaran ini dibayar.</Text>
-      ) : [...payments].sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
-        <PaymentHistoryRow key={payment.id} payment={payment} colors={colors} onOpen={() => onOpenPayment(payment)} />
+      ) : sortedPayments.map((payment, index) => (
+        <PaymentHistoryRow
+          key={payment.id}
+          payment={payment}
+          colors={colors}
+          onOpen={() => onOpenPayment(payment)}
+          onUndo={index === 0 ? () => onUndoPayment(payment) : undefined}
+        />
       ))}
     </View>
   );
@@ -216,7 +231,7 @@ function RoutineCard({ routine, payments, colors, onEdit, onDelete, onPay, onOpe
 export default function CatatanScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { debts, deposits, routines, routinePayments, loading, error, reload, deleteDebt, deleteDeposit, deleteRoutine, payRoutine } = useNotes();
+  const { debts, deposits, routines, routinePayments, loading, error, reload, deleteDebt, deleteDeposit, deleteRoutine, payRoutine, undoRoutinePayment } = useNotes();
   const [section, setSection] = useState<Section>('debt');
   const [refreshing, setRefreshing] = useState(false);
   const [payingRoutine, setPayingRoutine] = useState<Routine | null>(null);
@@ -256,6 +271,16 @@ export default function CatatanScreen() {
     }
   };
   const nextPaymentDate = payingRoutine ? getNextExpenseDueDate(payingRoutine.frequency, payingRoutine.dueDate, payingRoutine.anchorDay) : null;
+  const undoRoutine = (payment: RoutinePayment) => {
+    confirmAction(
+      'Batalkan pembayaran?',
+      `${formatRupiah(payment.amount)} untuk ${payment.title} akan dikembalikan menjadi pengeluaran aktif. Jika ada periode berikutnya yang dibuat otomatis, periode itu akan diganti dengan periode yang dibatalkan.`,
+      'Batalkan pembayaran',
+      false,
+      () => action(() => undoRoutinePayment(payment.id)),
+    );
+  };
+
   const navigate = (type: 'debt' | 'deposit' | 'routine', id?: string, debtId?: string) => router.push({ pathname: '/catatan-form', params: { type, ...(id ? { id } : {}), ...(debtId ? { debtId } : {}) } });
   const refresh = async () => { setRefreshing(true); try { await reload(); } catch (cause) { showError(cause); } finally { setRefreshing(false); } };
   const empty = section === 'debt' ? debts.length === 0 : routines.length === 0;
@@ -341,7 +366,14 @@ export default function CatatanScreen() {
               <View style={[styles.archive, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 18 }]}>
                 <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pembayaran tersimpan</Text>
                 {[...routinePayments].sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
-                  <PaymentHistoryRow key={payment.id} payment={payment} colors={colors} showTitle onOpen={() => setSnapshot(paymentSnapshot(payment))} />
+                  <PaymentHistoryRow
+                    key={payment.id}
+                    payment={payment}
+                    colors={colors}
+                    showTitle
+                    onOpen={() => setSnapshot(paymentSnapshot(payment))}
+                    onUndo={!routinePayments.some(other => other.routineId === payment.routineId && other.paidAt > payment.paidAt) ? () => undoRoutine(payment) : undefined}
+                  />
                 ))}
               </View>
             )}
@@ -362,13 +394,20 @@ export default function CatatanScreen() {
             {[...routines].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).map(routine => (
               <RoutineCard key={routine.id} routine={routine} payments={routinePayments.filter(x => x.routineId === routine.id)} colors={colors}
                 onEdit={() => navigate('routine', routine.id)} onDelete={() => removeRoutine(routine)} onPay={() => markRoutine(routine)}
-                onOpenPayment={payment => setSnapshot(paymentSnapshot(payment))} />
+                onOpenPayment={payment => setSnapshot(paymentSnapshot(payment))} onUndoPayment={undoRoutine} />
             ))}
             {routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)).length > 0 && (
               <View style={[styles.archive, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pengeluaran selesai</Text>
                 {routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)).sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
-                  <PaymentHistoryRow key={payment.id} payment={payment} colors={colors} showTitle onOpen={() => setSnapshot(paymentSnapshot(payment))} />
+                  <PaymentHistoryRow
+                    key={payment.id}
+                    payment={payment}
+                    colors={colors}
+                    showTitle
+                    onOpen={() => setSnapshot(paymentSnapshot(payment))}
+                    onUndo={!routinePayments.some(other => other.routineId === payment.routineId && other.paidAt > payment.paidAt) ? () => undoRoutine(payment) : undefined}
+                  />
                 ))}
               </View>
             )}

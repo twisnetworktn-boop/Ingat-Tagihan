@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BILL_CATEGORIES, type Bill, useBills } from '@/contexts/BillsContext';
+import { type Bill, useBills } from '@/contexts/BillsContext';
 import { SurfaceBackground } from '@/components/SurfaceBackground';
 import { TopMenu } from '@/components/TopMenu';
 import { TransactionSnapshot, type Snapshot } from '@/components/TransactionSnapshot';
@@ -28,14 +28,15 @@ function BillCard({
   onOpen,
   onMarkPaid,
   onDelete,
+  onUndoPaid,
 }: {
   bill: Bill;
   onOpen: () => void;
   onMarkPaid: () => void;
   onDelete: () => void;
+  onUndoPaid: () => void;
 }) {
   const colors = useColors();
-  const category = BILL_CATEGORIES.find((item) => item.id === bill.category) ?? BILL_CATEGORIES[5];
   const daysUntilDue = getDaysUntilDue(bill.dueDate);
   const isOverdue = !bill.isPaid && daysUntilDue < 0;
   const paidLabel = bill.paidAt
@@ -52,14 +53,16 @@ function BillCard({
       >
         <View style={styles.billTop}>
           <View style={[styles.categoryIcon, { backgroundColor: bill.isPaid ? colors.muted : colors.secondary }]}>
-            <Feather name={category.icon} size={18} color={bill.isPaid ? colors.mutedForeground : colors.primary} />
+            <Feather name="user" size={18} color={bill.isPaid ? colors.mutedForeground : colors.primary} />
           </View>
           <View style={styles.billMain}>
             <Text numberOfLines={1} style={[styles.billTitle, { color: colors.foreground }]}>
               {bill.title}
             </Text>
             <Text numberOfLines={1} style={[styles.billCategory, { color: colors.mutedForeground }]}>
-            {bill.isPaid ? `${category.label} · Jatuh tempo ${formatShortDate(bill.dueDate)}` : `${category.label} · ${bill.repeat === 'once' ? 'Sekali bayar' : 'Bulanan'}`}
+              {bill.isPaid
+                ? `${bill.note} · Jatuh tempo ${formatShortDate(bill.dueDate)}`
+                : `${bill.note} · ${bill.repeat === 'once' ? 'Sekali bayar' : 'Bulanan'}`}
             </Text>
           </View>
           <Text style={[styles.amount, { color: colors.foreground }, bill.isPaid && styles.paidText]}>
@@ -94,9 +97,15 @@ function BillCard({
         ) : null}
         <View style={styles.cardActions}>
           {bill.isPaid ? (
-            <View accessibilityLabel="Pembayaran tercatat" style={[styles.statusButton, { borderColor: colors.action, backgroundColor: colors.action }]}>
-              <Feather name="check" size={14} color={colors.actionForeground} />
-            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Batalkan status lunas ${bill.title}`}
+              hitSlop={10}
+              onPress={onUndoPaid}
+              style={({ pressed }) => [styles.statusButton, { borderColor: colors.border, backgroundColor: 'transparent' }, pressed && styles.pressed]}
+            >
+              <Feather name="rotate-ccw" size={14} color={colors.action} />
+            </Pressable>
           ) : (
             <Pressable
               accessibilityRole="button"
@@ -124,7 +133,7 @@ function BillCard({
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { bills, loading, error, reload, deleteBill, markPaid } = useBills();
+  const { bills, loading, error, reload, deleteBill, markPaid, undoPaid } = useBills();
   const [filter, setFilter] = useState<Filter>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [snapshotBillId, setSnapshotBillId] = useState<string | null>(null);
@@ -160,7 +169,7 @@ export default function HomeScreen() {
     rows: [
       { label: 'Status', value: 'Lunas' },
       { label: 'Nominal', value: formatRupiah(snapshotBill.amount) },
-      { label: 'Kategori', value: (BILL_CATEGORIES.find(item => item.id === snapshotBill.category) ?? BILL_CATEGORIES[5]).label },
+      { label: 'Pasal', value: snapshotBill.note },
       { label: 'Jenis', value: snapshotBill.repeat === 'once' ? 'Sekali bayar' : 'Bulanan' },
       { label: 'Jatuh tempo', value: formatDateInput(snapshotBill.dueDate) },
       { label: 'Dibayar', value: snapshotBill.paidAt ? formatDateInput(snapshotBill.paidAt.slice(0, 10)) : 'Tanggal tidak tercatat' },
@@ -207,6 +216,27 @@ export default function HomeScreen() {
       Alert.alert('Konfirmasi pembayaran?', message, [
         { text: 'Batal', style: 'cancel' },
         { text: 'Sudah dibayar', onPress: confirmPayment },
+      ]);
+    }
+  };
+
+  const undoPayment = (bill: Bill) => {
+    const message = bill.repeat === 'once'
+      ? `${bill.title} akan dikembalikan menjadi tagihan aktif.`
+      : `${bill.title} akan dikembalikan menjadi tagihan aktif dan tagihan periode berikutnya yang dibuat otomatis akan dihapus.`;
+    const confirmUndo = () => {
+      void undoPaid(bill.id).catch((cause: unknown) => {
+        const errorMessage = cause instanceof Error ? cause.message : 'Pembayaran belum bisa dibatalkan.';
+        if (Platform.OS === 'web') window.alert(errorMessage);
+        else Alert.alert('Belum berhasil', errorMessage);
+      });
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Batalkan status lunas?\n\n${message}`)) confirmUndo();
+    } else {
+      Alert.alert('Batalkan status lunas?', message, [
+        { text: 'Batal', style: 'cancel' },
+        { text: 'Batalkan lunas', onPress: confirmUndo },
       ]);
     }
   };
@@ -371,6 +401,7 @@ export default function HomeScreen() {
             onOpen={() => item.isPaid ? setSnapshotBillId(item.id) : router.push({ pathname: '/bill-form', params: { id: item.id } })}
             onMarkPaid={() => changePaid(item)}
             onDelete={() => removeBill(item)}
+            onUndoPaid={() => undoPayment(item)}
           />
         )}
         ListHeaderComponent={header}

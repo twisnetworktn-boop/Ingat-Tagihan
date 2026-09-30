@@ -53,6 +53,7 @@ type BillsContextValue = {
   saveBill: (input: BillInput) => Promise<string>;
   deleteBill: (id: string) => Promise<void>;
   markPaid: (id: string) => Promise<void>;
+  undoPaid: (id: string) => Promise<void>;
 };
 
 const BillsContext = createContext<BillsContextValue | null>(null);
@@ -117,8 +118,8 @@ async function scheduleBillReminder(bill: Bill): Promise<string | undefined> {
     content: {
       title: `Pengingat: ${bill.title}`,
       body: reminder.isDueDay
-        ? `Jatuh tempo hari ini · ${amount}`
-        : `Jatuh tempo besok · ${amount}`,
+        ? `${bill.note} · jatuh tempo hari ini · ${amount}`
+        : `${bill.note} · jatuh tempo besok · ${amount}`,
       sound: true,
       data: { billId: bill.id },
     },
@@ -186,12 +187,17 @@ export function BillsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const saveBill = useCallback((input: BillInput) => enqueue(async () => {
+    if (!input.title.trim() || !input.note.trim() || !Number.isSafeInteger(input.amount) || input.amount <= 0) {
+      throw new Error('Isi nama orang, pasal tagihan, dan nominal yang valid.');
+    }
     const previous = input.id ? billsRef.current.find((bill) => bill.id === input.id) : undefined;
     if (input.id && !previous) throw new Error('Tagihan tidak ditemukan. Buka ulang daftar tagihan.');
     if (previous?.isPaid) throw new Error('Tagihan lunas tersimpan sebagai riwayat dan tidak dapat diubah.');
     const id = input.id ?? createBillId();
     const nextBill: Bill = {
       ...input,
+      title: input.title.trim(),
+      note: input.note.trim(),
       id,
       repeat: input.repeat ?? previous?.repeat ?? 'monthly',
       isPaid: previous?.isPaid ?? false,
@@ -285,8 +291,82 @@ export function BillsProvider({ children }: { children: ReactNode }) {
     if (reminderWarning) setError(reminderWarning);
   }), [enqueue, persist]);
 
+  const undoPaid = useCallback((id: string) => enqueue(async () => {
+    const bill = billsRef.current.find((item) => item.id === id);
+    if (!bill || !bill.isPaid) return;
+
+    const seriesId = bill.seriesId ?? bill.id;
+    const paidAt = bill.paidAt ?? '';
+    const newerPaid = billsRef.current.some((item) =>
+      item.id !== bill.id &&
+      (item.seriesId ?? item.id) === seriesId &&
+      item.isPaid &&
+      (item.paidAt ?? '') > paidAt
+    );
+    if (newerPaid) {
+      throw new Error('Pembayaran ini bukan pembayaran terbaru. Batalkan pembayaran paling baru terlebih dahulu.');
+    }
+
+    const recurrenceDay = bill.recurrenceDay ?? Number(bill.dueDate.slice(-2));
+    let successor: Bill | undefined;
+    if ((bill.repeat ?? 'monthly') !== 'once') {
+      const expectedDueDate = getNextMonthlyDueDate(bill.dueDate, recurrenceDay);
+      const activeSeries = billsRef.current.filter((item) =>
+        !item.isPaid && (item.seriesId ?? item.id) === seriesId
+      );
+      if (activeSeries.length > 1) {
+        throw new Error('Rangkaian tagihan memiliki lebih dari satu tagihan aktif. Koreksi data terlebih dahulu.');
+      }
+      if (activeSeries.length === 1) {
+        const candidate = activeSeries[0];
+        const unchanged =
+          candidate.dueDate === expectedDueDate &&
+          candidate.title === bill.title &&
+          candidate.amount === bill.amount &&
+          candidate.note === bill.note &&
+          candidate.category === bill.category &&
+          candidate.repeat === bill.repeat &&
+          candidate.remind === bill.remind &&
+          candidate.recurrenceDay === recurrenceDay;
+        if (!unchanged) {
+          throw new Error('Tagihan periode berikutnya sudah diubah. Pembayaran ini tidak dapat dibatalkan otomatis.');
+        }
+        successor = candidate;
+      }
+    }
+
+    const restored: Bill = {
+      ...bill,
+      isPaid: false,
+      paidAt: undefined,
+      notificationId: undefined,
+      seriesId,
+      recurrenceDay,
+    };
+
+    try {
+      restored.notificationId = await scheduleBillReminder(restored);
+      await persist(
+        billsRef.current
+          .filter((item) => item.id !== successor?.id)
+          .map((item) => item.id === bill.id ? restored : item),
+      );
+    } catch (cause) {
+      if (restored.notificationId) {
+        await cancelBillReminder(restored.notificationId).catch(() => undefined);
+      }
+      throw cause;
+    }
+
+    if (successor?.notificationId) {
+      await cancelBillReminder(successor.notificationId).catch(() => {
+        setError('Pembayaran dibatalkan, tetapi pengingat periode berikutnya belum berhasil dibersihkan.');
+      });
+    }
+  }), [enqueue, persist]);
+
   return (
-    <BillsContext.Provider value={{ bills, loading, error, reload, saveBill, deleteBill, markPaid }}>
+    <BillsContext.Provider value={{ bills, loading, error, reload, saveBill, deleteBill, markPaid, undoPaid }}>
       {children}
     </BillsContext.Provider>
   );
