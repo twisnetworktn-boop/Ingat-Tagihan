@@ -52,6 +52,8 @@ export type RoutinePayment = {
   category?: BillCategory;
   note?: string;
   frequency?: Routine['frequency'];
+  anchorDay?: number;
+  remind?: boolean;
   receiptUri?: string;
 };
 
@@ -75,6 +77,7 @@ type NotesContextValue = NotesData & {
   saveRoutine: (input: RoutineInput) => Promise<string>;
   deleteRoutine: (id: string) => Promise<void>;
   payRoutine: (id: string, receipt?: PhotoDraft) => Promise<void>;
+  undoRoutinePayment: (paymentId: string) => Promise<void>;
 };
 
 const EMPTY_DATA: NotesData = { debts: [], deposits: [], routines: [], routinePayments: [] };
@@ -366,6 +369,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       category: routine.category ?? 'other',
       note: routine.note,
       frequency: routine.frequency,
+      anchorDay: routine.anchorDay,
+      remind: routine.remind,
       receiptUri,
     };
     const nextDueDate = getNextExpenseDueDate(routine.frequency, routine.dueDate, routine.anchorDay);
@@ -398,10 +403,75 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     if (warning) setError(warning);
   }), [enqueue, persist]);
 
+  const undoRoutinePayment = useCallback((paymentId: string) => enqueue(async () => {
+    const current = dataRef.current;
+    const payment = current.routinePayments.find((item) => item.id === paymentId);
+    if (!payment) return;
+
+    const newerPayment = current.routinePayments.some((item) =>
+      item.id !== payment.id &&
+      item.routineId === payment.routineId &&
+      item.paidAt > payment.paidAt
+    );
+    if (newerPayment) {
+      throw new Error('Pembayaran ini bukan pembayaran terbaru. Batalkan pembayaran paling baru terlebih dahulu.');
+    }
+
+    const frequency = payment.frequency ?? 'once';
+    const anchorDay = payment.anchorDay ?? Number(payment.dueDate.slice(-2));
+    const active = current.routines.find((item) => item.id === payment.routineId);
+    const expectedNext = getNextExpenseDueDate(frequency, payment.dueDate, anchorDay);
+
+    if (active && expectedNext && active.dueDate !== expectedNext) {
+      throw new Error('Pengeluaran periode berikutnya sudah diubah. Pembayaran ini tidak dapat dibatalkan otomatis.');
+    }
+    if (active && !expectedNext) {
+      throw new Error('Data pengeluaran sekali bayar tidak konsisten. Muat ulang sebelum melakukan koreksi.');
+    }
+
+    const restored: Routine = {
+      id: payment.routineId,
+      title: payment.title,
+      amount: payment.amount,
+      dueDate: payment.dueDate,
+      frequency,
+      anchorDay,
+      remind: payment.remind ?? false,
+      note: payment.note ?? '',
+      category: payment.category ?? 'other',
+      notificationId: undefined,
+    };
+
+    try {
+      restored.notificationId = await scheduleReminder('routine', restored);
+      await persist({
+        ...current,
+        routines: active
+          ? current.routines.map((item) => item.id === active.id ? restored : item)
+          : [restored, ...current.routines],
+        routinePayments: current.routinePayments.filter((item) => item.id !== payment.id),
+      });
+    } catch (cause) {
+      await cancelReminder(restored.notificationId).catch(() => undefined);
+      throw cause;
+    }
+
+    if (active?.notificationId) {
+      await cancelReminder(active.notificationId).catch(() => {
+        setError('Pembayaran dibatalkan, tetapi pengingat periode berikutnya belum berhasil dibersihkan.');
+      });
+    }
+    try {
+      removeStoredPhoto(payment.receiptUri);
+    } catch {
+      setError('Pembayaran dibatalkan, tetapi foto nota lama belum bisa dibersihkan.');
+    }
+  }), [enqueue, persist]);
+
   return (
     <NotesContext.Provider value={{
       ...data, loading, error, reload, saveDebt, deleteDebt,
-      saveDeposit, deleteDeposit, saveRoutine, deleteRoutine, payRoutine,
+      saveDeposit, deleteDeposit, saveRoutine, deleteRoutine, payRoutine, undoRoutinePayment,
     }}>
       {children}
     </NotesContext.Provider>
