@@ -318,10 +318,20 @@ export function BillsProvider({ children }: { children: ReactNode }) {
         throw new Error('Rangkaian tagihan memiliki lebih dari satu tagihan aktif. Koreksi data terlebih dahulu.');
       }
       if (activeSeries.length === 1) {
-        if (activeSeries[0].dueDate !== expectedDueDate) {
+        const candidate = activeSeries[0];
+        const unchanged =
+          candidate.dueDate === expectedDueDate &&
+          candidate.title === bill.title &&
+          candidate.amount === bill.amount &&
+          candidate.note === bill.note &&
+          candidate.category === bill.category &&
+          candidate.repeat === bill.repeat &&
+          candidate.remind === bill.remind &&
+          candidate.recurrenceDay === recurrenceDay;
+        if (!unchanged) {
           throw new Error('Tagihan periode berikutnya sudah diubah. Pembayaran ini tidak dapat dibatalkan otomatis.');
         }
-        successor = activeSeries[0];
+        successor = candidate;
       }
     }
 
