@@ -422,8 +422,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     const active = current.routines.find((item) => item.id === payment.routineId);
     const expectedNext = getNextExpenseDueDate(frequency, payment.dueDate, anchorDay);
 
-    if (active && expectedNext && active.dueDate !== expectedNext) {
-      throw new Error('Pengeluaran periode berikutnya sudah diubah. Pembayaran ini tidak dapat dibatalkan otomatis.');
+    if (active && expectedNext) {
+      const unchanged =
+        active.dueDate === expectedNext &&
+        active.title === payment.title &&
+        active.amount === payment.amount &&
+        active.frequency === frequency &&
+        active.anchorDay === anchorDay &&
+        active.note === (payment.note ?? '') &&
+        (active.category ?? 'other') === (payment.category ?? 'other') &&
+        (payment.remind === undefined || active.remind === payment.remind);
+      if (!unchanged) {
+        throw new Error('Pengeluaran periode berikutnya sudah diubah. Pembayaran ini tidak dapat dibatalkan otomatis.');
+      }
     }
     if (active && !expectedNext) {
       throw new Error('Data pengeluaran sekali bayar tidak konsisten. Muat ulang sebelum melakukan koreksi.');
