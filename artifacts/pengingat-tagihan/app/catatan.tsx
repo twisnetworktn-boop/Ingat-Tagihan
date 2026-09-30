@@ -400,7 +400,14 @@ export default function CatatanScreen() {
               <View style={[styles.archive, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pengeluaran selesai</Text>
                 {routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)).sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
-                  <PaymentHistoryRow key={payment.id} payment={payment} colors={colors} showTitle onOpen={() => setSnapshot(paymentSnapshot(payment))} />
+                  <PaymentHistoryRow
+                    key={payment.id}
+                    payment={payment}
+                    colors={colors}
+                    showTitle
+                    onOpen={() => setSnapshot(paymentSnapshot(payment))}
+                    onUndo={!routinePayments.some(other => other.routineId === payment.routineId && other.paidAt > payment.paidAt) ? () => undoRoutine(payment) : undefined}
+                  />
                 ))}
               </View>
             )}
