@@ -91,6 +91,7 @@ function DebtCard({ debt, deposits, colors, onEdit, onDelete, onAddDeposit, onEd
   debt: Debt; deposits: Deposit[]; colors: Palette; onEdit: () => void; onDelete: () => void; onAddDeposit: () => void; onSnapshot: () => void;
   onEditDeposit: (deposit: Deposit) => void; onDeleteDeposit: (deposit: Deposit) => void;
 }) {
+  const [showHistory, setShowHistory] = useState(false);
   const paid = deposits.reduce((total, deposit) => total + deposit.amount, 0);
   const remaining = Math.max(0, debt.amount - paid);
   const settled = remaining === 0;
@@ -131,7 +132,10 @@ function DebtCard({ debt, deposits, colors, onEdit, onDelete, onAddDeposit, onEd
       )}
       <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />
       <View style={styles.depositHeading}>
-        <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Setoran <Text style={{ color: colors.mutedForeground }}>({deposits.length})</Text></Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${showHistory ? "Tutup" : "Lihat"} ${deposits.length} setoran ${debt.person}`} accessibilityState={{ expanded: showHistory }} onPress={() => setShowHistory(value => !value)} style={styles.expandHeader}>
+          <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Setoran ({deposits.length})</Text>
+          <Feather name={showHistory ? "chevron-up" : "chevron-down"} size={16} color={colors.action} />
+        </Pressable>
         {!settled && (
           <Pressable accessibilityRole="button" onPress={onAddDeposit} style={styles.inlineAdd}>
             <Feather name="plus" size={15} color={colors.action} />
@@ -141,7 +145,7 @@ function DebtCard({ debt, deposits, colors, onEdit, onDelete, onAddDeposit, onEd
       </View>
       {deposits.length === 0 ? (
         <Text style={[styles.depositEmpty, { color: colors.mutedForeground }]}>Belum ada setoran. Saldo akan berkurang saat kamu mencatatnya.</Text>
-      ) : [...deposits].sort((a, b) => b.date.localeCompare(a.date)).map(deposit => (
+      ) : showHistory ? [...deposits].sort((a, b) => b.date.localeCompare(a.date)).map(deposit => (
         <View key={deposit.id} style={[styles.depositLine, { borderTopColor: colors.border }]}>
           <View style={[styles.depositDot, { backgroundColor: colors.actionSoft }]}><Feather name="arrow-down-left" size={13} color={colors.action} /></View>
           <View style={styles.depositCopy}>
@@ -151,7 +155,7 @@ function DebtCard({ debt, deposits, colors, onEdit, onDelete, onAddDeposit, onEd
           <Pressable accessibilityRole="button" accessibilityLabel={`Ubah setoran ${formatRupiah(deposit.amount)}`} onPress={() => onEditDeposit(deposit)} hitSlop={8} style={styles.rowIcon}><Feather name="edit-2" size={14} color={colors.mutedForeground} /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={`Hapus setoran ${formatRupiah(deposit.amount)}`} onPress={() => onDeleteDeposit(deposit)} hitSlop={8} style={styles.rowIcon}><Feather name="trash-2" size={14} color={colors.destructive} /></Pressable>
         </View>
-      ))}
+      )) : null}
     </View>
   );
 }
@@ -182,11 +186,12 @@ function RoutineCard({ routine, payments, colors, onEdit, onDelete, onPay, onOpe
   routine: Routine; payments: RoutinePayment[]; colors: Palette; onEdit: () => void; onDelete: () => void; onPay: () => void;
   onOpenPayment: (payment: RoutinePayment) => void; onUndoPayment: (payment: RoutinePayment) => void;
 }) {
+  const [showHistory, setShowHistory] = useState(false);
   const category = expenseCategory(routine.category);
   const due = routine.dueDate < getLocalDateString(new Date())
     ? 'Lewat jatuh tempo'
     : `${routine.frequency === 'once' ? 'Jatuh tempo' : 'Berikutnya'} ${formatDateInput(routine.dueDate)}`;
-  const sortedPayments = [...payments].sort((a, b) => b.paidAt.localeCompare(a.paidAt));
+  const sortedPayments = showHistory ? [...payments].sort((a, b) => b.paidAt.localeCompare(a.paidAt)) : [];
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.cardTop}>
@@ -212,7 +217,10 @@ function RoutineCard({ routine, payments, colors, onEdit, onDelete, onPay, onOpe
         <Text style={[styles.payText, { color: colors.actionForeground }]}>Sudah dibayar</Text>
       </Pressable>
       <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />
-      <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pembayaran <Text style={{ color: colors.mutedForeground }}>({payments.length})</Text></Text>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHistory }} onPress={() => setShowHistory(value => !value)} style={styles.expandHeader}>
+        <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pembayaran ({payments.length})</Text>
+        <Feather name={showHistory ? "chevron-up" : "chevron-down"} size={16} color={colors.action} />
+      </Pressable>
       {payments.length === 0 ? (
         <Text style={[styles.depositEmpty, { color: colors.mutedForeground }]}>Belum ada pembayaran. Konfirmasi setelah pengeluaran ini dibayar.</Text>
       ) : sortedPayments.map((payment, index) => (
@@ -233,6 +241,7 @@ export default function CatatanScreen() {
   const insets = useSafeAreaInsets();
   const { debts, deposits, routines, routinePayments, loading, error, reload, deleteDebt, deleteDeposit, deleteRoutine, payRoutine, undoRoutinePayment } = useNotes();
   const [section, setSection] = useState<Section>('debt');
+  const [showArchive, setShowArchive] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [payingRoutine, setPayingRoutine] = useState<Routine | null>(null);
   const [receiptDraft, setReceiptDraft] = useState<PhotoDraft | null>(null);
@@ -244,7 +253,18 @@ export default function CatatanScreen() {
     owe: debts.filter(x => x.direction === 'owe').sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
     owed: debts.filter(x => x.direction === 'owed').sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
   }), [debts]);
-  const balance = (debt: Debt) => Math.max(0, debt.amount - deposits.filter(x => x.debtId === debt.id).reduce((sum, x) => sum + x.amount, 0));
+  const depositsByDebtId = useMemo(() => {
+    const grouped = new Map<string, Deposit[]>();
+    deposits.forEach(deposit => grouped.set(deposit.debtId, [...(grouped.get(deposit.debtId) ?? []), deposit]));
+    return grouped;
+  }, [deposits]);
+  const paymentsByRoutineId = useMemo(() => {
+    const grouped = new Map<string, RoutinePayment[]>();
+    routinePayments.forEach(payment => grouped.set(payment.routineId, [...(grouped.get(payment.routineId) ?? []), payment]));
+    return grouped;
+  }, [routinePayments]);
+  const archivedPayments = useMemo(() => routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)), [routinePayments, routines]);
+  const balance = (debt: Debt) => Math.max(0, debt.amount - (depositsByDebtId.get(debt.id) ?? []).reduce((sum, x) => sum + x.amount, 0));
   const oweTotal = groups.owe.reduce((sum, debt) => sum + balance(debt), 0);
   const owedTotal = groups.owed.reduce((sum, debt) => sum + balance(debt), 0);
   const openCount = debts.filter(x => balance(x) > 0).length;
@@ -294,9 +314,9 @@ export default function CatatanScreen() {
       {list.length === 0 ? (
         <View style={[styles.quietRow, { borderColor: colors.border, backgroundColor: colors.card }]}><Text style={[styles.quietText, { color: colors.mutedForeground }]}>Belum ada catatan di bagian ini.</Text></View>
       ) : list.map(debt => (
-        <DebtCard key={debt.id} debt={debt} deposits={deposits.filter(x => x.debtId === debt.id)} colors={colors}
+        <DebtCard key={debt.id} debt={debt} deposits={depositsByDebtId.get(debt.id) ?? []} colors={colors}
           onEdit={() => navigate('debt', debt.id)} onDelete={() => removeDebt(debt)} onAddDeposit={() => navigate('deposit', undefined, debt.id)}
-          onSnapshot={() => setSnapshot(debtSnapshot(debt, deposits.filter(x => x.debtId === debt.id)))}
+          onSnapshot={() => setSnapshot(debtSnapshot(debt, depositsByDebtId.get(debt.id) ?? []))}
           onEditDeposit={deposit => navigate('deposit', deposit.id)} onDeleteDeposit={removeDeposit} />
       ))}
     </View>
@@ -310,8 +330,8 @@ export default function CatatanScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />}
         contentContainerStyle={[styles.content, { paddingBottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 95 }]}
       >
-        <Text style={[styles.title, { color: colors.foreground }]}>Ayo Catat</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Utang dan pengeluaran rutin, tersimpan rapi di sini.</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>Catatan</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Pantau utang, piutang, dan pengeluaran dengan mudah.</Text>
         <TopMenu active="notes" />
 
         <LinearGradient colors={[colors.dashboardGlass, colors.dashboardGlassDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.summary, { borderColor: colors.border }]}>
@@ -364,8 +384,11 @@ export default function CatatanScreen() {
             </View>
             {section === 'routine' && routinePayments.length > 0 && (
               <View style={[styles.archive, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 18 }]}>
-                <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pembayaran tersimpan</Text>
-                {[...routinePayments].sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: showArchive }} onPress={() => setShowArchive(value => !value)} style={styles.expandHeader}>
+                  <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pembayaran ({routinePayments.length})</Text>
+                  <Feather name={showArchive ? 'chevron-up' : 'chevron-down'} size={16} color={colors.action} />
+                </Pressable>
+                {showArchive && [...routinePayments].sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
                   <PaymentHistoryRow
                     key={payment.id}
                     payment={payment}
@@ -392,14 +415,17 @@ export default function CatatanScreen() {
           <View style={styles.group}>
             <View style={styles.groupHeading}><View><Text style={[styles.groupTitle, { color: colors.foreground }]}>Pengeluaran berjalan</Text><Text style={[styles.groupSub, { color: colors.mutedForeground }]}>Konfirmasi saat sudah dibayar</Text></View><Text style={[styles.groupCount, { color: colors.primary }]}>{routines.length}</Text></View>
             {[...routines].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).map(routine => (
-              <RoutineCard key={routine.id} routine={routine} payments={routinePayments.filter(x => x.routineId === routine.id)} colors={colors}
+              <RoutineCard key={routine.id} routine={routine} payments={paymentsByRoutineId.get(routine.id) ?? []} colors={colors}
                 onEdit={() => navigate('routine', routine.id)} onDelete={() => removeRoutine(routine)} onPay={() => markRoutine(routine)}
                 onOpenPayment={payment => setSnapshot(paymentSnapshot(payment))} onUndoPayment={undoRoutine} />
             ))}
-            {routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)).length > 0 && (
+            {archivedPayments.length > 0 && (
               <View style={[styles.archive, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat pengeluaran selesai</Text>
-                {routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)).sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: showArchive }} onPress={() => setShowArchive(value => !value)} style={styles.expandHeader}>
+                  <Text style={[styles.depositHeadingText, { color: colors.foreground }]}>Riwayat selesai ({archivedPayments.length})</Text>
+                  <Feather name={showArchive ? "chevron-up" : "chevron-down"} size={16} color={colors.action} />
+                </Pressable>
+                {showArchive && [...archivedPayments].sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payment => (
                   <PaymentHistoryRow
                     key={payment.id}
                     payment={payment}
@@ -469,7 +495,8 @@ const styles = StyleSheet.create({
   snapshotLink: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 10, minHeight: 30 },
   snapshotLinkText: { fontFamily: 'Inter_600SemiBold', fontSize: 11 },
   cardDivider: { height: StyleSheet.hairlineWidth, marginVertical: 15 }, depositHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  depositHeadingText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 }, inlineAdd: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  depositHeadingText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  expandHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32, justifyContent: 'space-between' }, inlineAdd: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   inlineAddText: { fontFamily: 'Inter_600SemiBold', fontSize: 11 }, depositEmpty: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17, marginTop: 11 },
   depositLine: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingTop: 11, marginTop: 11, borderTopWidth: StyleSheet.hairlineWidth },
   depositDot: { height: 25, width: 25, borderRadius: 5, alignItems: 'center', justifyContent: 'center' }, depositCopy: { flex: 1, minWidth: 0 },
