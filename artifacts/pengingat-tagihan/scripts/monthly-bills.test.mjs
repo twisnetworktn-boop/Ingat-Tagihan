@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getNextExpenseDueDate, getNextMonthlyDueDate, getNextWeeklyDueDate } from '../lib/bill-format.ts';
+import { getNextExpenseDueDate, getNextMonthlyDueDate, getNextWeeklyDueDate, isValidBillDate } from '../lib/bill-format.ts';
 
 test('a monthly bill keeps its original due day after a short month', () => {
   assert.equal(getNextMonthlyDueDate('2025-01-31', 31), '2025-02-28');
@@ -21,4 +21,13 @@ test('a one-time expense has no next due date, while recurring expenses keep the
   assert.equal(getNextExpenseDueDate('once', '2026-10-05', 5), null);
   assert.equal(getNextExpenseDueDate('weekly', '2026-12-29', 29), '2027-01-05');
   assert.equal(getNextExpenseDueDate('monthly', '2025-01-31', 31), '2025-02-28');
+});
+
+test('validation rejects invalid dates before storage or reminders', () => {
+  assert.equal(isValidBillDate('2026-02-29'), false);
+  assert.equal(isValidBillDate('2024-02-29'), true);
+  assert.equal(isValidBillDate('2026-13-01'), false);
+  assert.equal(isValidBillDate('2026-01-00'), false);
+  assert.equal(isValidBillDate('2026-11-31'), false);
+  assert.equal(isValidBillDate('2026-10-13'), true);
 });
