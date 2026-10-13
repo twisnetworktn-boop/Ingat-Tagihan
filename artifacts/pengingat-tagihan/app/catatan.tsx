@@ -242,6 +242,7 @@ export default function CatatanScreen() {
   const { debts, deposits, routines, routinePayments, loading, error, reload, deleteDebt, deleteDeposit, deleteRoutine, payRoutine, undoRoutinePayment } = useNotes();
   const [section, setSection] = useState<Section>('debt');
   const [showArchive, setShowArchive] = useState(false);
+  const [showSettled, setShowSettled] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [payingRoutine, setPayingRoutine] = useState<Routine | null>(null);
   const [receiptDraft, setReceiptDraft] = useState<PhotoDraft | null>(null);
@@ -255,12 +256,18 @@ export default function CatatanScreen() {
   }), [debts]);
   const depositsByDebtId = useMemo(() => {
     const grouped = new Map<string, Deposit[]>();
-    deposits.forEach(deposit => grouped.set(deposit.debtId, [...(grouped.get(deposit.debtId) ?? []), deposit]));
+    deposits.forEach(deposit => {
+      if (!grouped.has(deposit.debtId)) grouped.set(deposit.debtId, []);
+      grouped.get(deposit.debtId)!.push(deposit);
+    });
     return grouped;
   }, [deposits]);
   const paymentsByRoutineId = useMemo(() => {
     const grouped = new Map<string, RoutinePayment[]>();
-    routinePayments.forEach(payment => grouped.set(payment.routineId, [...(grouped.get(payment.routineId) ?? []), payment]));
+    routinePayments.forEach(payment => {
+      if (!grouped.has(payment.routineId)) grouped.set(payment.routineId, []);
+      grouped.get(payment.routineId)!.push(payment);
+    });
     return grouped;
   }, [routinePayments]);
   const archivedPayments = useMemo(() => routinePayments.filter(payment => !routines.some(routine => routine.id === payment.routineId)), [routinePayments, routines]);
@@ -268,6 +275,7 @@ export default function CatatanScreen() {
   const oweTotal = groups.owe.reduce((sum, debt) => sum + balance(debt), 0);
   const owedTotal = groups.owed.reduce((sum, debt) => sum + balance(debt), 0);
   const openCount = debts.filter(x => balance(x) > 0).length;
+  const settledCount = debts.length - openCount;
   const openDebts = debts.filter(x => balance(x) > 0);
   const action = (task: () => Promise<void>) => { void task().catch(showError); };
   const removeDebt = (debt: Debt) => confirmAction('Hapus catatan utang?', `${debt.person} dan semua setoran yang terkait akan dihapus permanen.`, 'Hapus utang', true, () => action(() => deleteDebt(debt.id)));
@@ -309,11 +317,11 @@ export default function CatatanScreen() {
     <View style={styles.group}>
       <View style={styles.groupHeading}>
         <View><Text style={[styles.groupTitle, { color: colors.foreground }]}>{title}</Text><Text style={[styles.groupSub, { color: colors.mutedForeground }]}>{subtitle}</Text></View>
-        <Text style={[styles.groupCount, { color: colors.primary }]}>{list.length}</Text>
+        <Text style={[styles.groupCount, { color: colors.primary }]}>{list.filter(debt => showSettled || balance(debt) > 0).length}</Text>
       </View>
-      {list.length === 0 ? (
-        <View style={[styles.quietRow, { borderColor: colors.border, backgroundColor: colors.card }]}><Text style={[styles.quietText, { color: colors.mutedForeground }]}>Belum ada catatan di bagian ini.</Text></View>
-      ) : list.map(debt => (
+      {list.filter(debt => showSettled || balance(debt) > 0).length === 0 ? (
+        <View style={[styles.quietRow, { borderColor: colors.border, backgroundColor: colors.card }]}><Text style={[styles.quietText, { color: colors.mutedForeground }]}>Tidak ada utang aktif di bagian ini.</Text></View>
+      ) : list.filter(debt => showSettled || balance(debt) > 0).map(debt => (
         <DebtCard key={debt.id} debt={debt} deposits={depositsByDebtId.get(debt.id) ?? []} colors={colors}
           onEdit={() => navigate('debt', debt.id)} onDelete={() => removeDebt(debt)} onAddDeposit={() => navigate('deposit', undefined, debt.id)}
           onSnapshot={() => setSnapshot(debtSnapshot(debt, depositsByDebtId.get(debt.id) ?? []))}
@@ -403,6 +411,12 @@ export default function CatatanScreen() {
           </>
         ) : section === 'debt' ? (
           <>
+            {settledCount > 0 && (
+              <Pressable accessibilityRole="button" accessibilityState={{ expanded: showSettled }} onPress={() => setShowSettled(value => !value)} style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <Feather name={showSettled ? 'chevron-up' : 'chevron-down'} size={16} color={colors.action} />
+                <Text style={[styles.secondaryActionText, { color: colors.action }]}>{showSettled ? 'Sembunyikan yang lunas' : `Lihat yang lunas (${settledCount})`}</Text>
+              </Pressable>
+            )}
             {renderGroup('Saya berutang', 'Yang perlu kubayar', groups.owe)}
             {renderGroup('Mereka berutang', 'Yang perlu kuterima', groups.owed)}
             {openDebts.length > 0 && (
@@ -487,7 +501,7 @@ const styles = StyleSheet.create({
   cardMainTouch: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 9 },
   cardIcon: { height: 39, width: 39, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }, cardMain: { flex: 1, minWidth: 0 },
   cardTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14 }, cardSub: { fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 15, marginTop: 3 },
-  smallAction: { width: 29, height: 29, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  smallAction: { width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   balanceRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 18, gap: 8 }, eyebrow: { fontFamily: 'Inter_600SemiBold', fontSize: 9, letterSpacing: 0.9 },
   balance: { fontFamily: 'Inter_700Bold', fontSize: 22, letterSpacing: -0.5, marginTop: 4 }, total: { fontFamily: 'Inter_400Regular', fontSize: 10, paddingBottom: 3 },
   progressTrack: { height: 5, borderRadius: 3, marginTop: 13, overflow: 'hidden' }, progressFill: { height: '100%', borderRadius: 3 },
