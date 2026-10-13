@@ -9,7 +9,7 @@ export function TopMenu({ active }: { active: 'bills' | 'notes' }) {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 15_000);
+    const timer = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
 
@@ -67,11 +67,11 @@ export default TopMenu;
 const styles = StyleSheet.create({
   dateTimeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 },
   dateGroup: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
-  dateText: { fontFamily: 'Inter_500Medium', fontSize: 11, flexShrink: 1 },
+  dateText: { fontFamily: 'Inter_500Medium', fontSize: 12, flexShrink: 1 },
   timeGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   timeText: { fontFamily: 'Inter_700Bold', fontSize: 12 },
   wrap: { flexDirection: 'row', padding: 4, borderWidth: 1, borderRadius: 9, gap: 4 },
-  tab: { flex: 1, height: 39, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: 'transparent', borderRadius: 6 },
-  label: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  tab: { flex: 1, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: 'transparent', borderRadius: 6 },
+  label: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   pressed: { opacity: 0.72 },
 });
