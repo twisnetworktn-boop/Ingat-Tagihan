@@ -4,7 +4,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import * as Notifications from 'expo-notifications';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { formatRupiah, getNextMonthlyDueDate } from '@/lib/bill-format';
+import { formatRupiah, getNextMonthlyDueDate, isValidBillDate } from '@/lib/bill-format';
 
 const STORAGE_KEY = '@ingat-tagihan/bills/v1';
 const ANDROID_CHANNEL_ID = 'bill-reminders';
@@ -151,7 +151,7 @@ export function BillsProvider({ children }: { children: ReactNode }) {
     return result;
   }, []);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(() => enqueue(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -165,7 +165,7 @@ export function BillsProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }), [enqueue]);
 
   useEffect(() => {
     void reload();
@@ -187,8 +187,8 @@ export function BillsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const saveBill = useCallback((input: BillInput) => enqueue(async () => {
-    if (!input.title.trim() || !input.note.trim() || !Number.isSafeInteger(input.amount) || input.amount <= 0) {
-      throw new Error('Isi nama orang, pasal tagihan, dan nominal yang valid.');
+    if (!input.title.trim() || !input.note.trim() || !Number.isSafeInteger(input.amount) || input.amount <= 0 || !isValidBillDate(input.dueDate)) {
+      throw new Error('Isi nama orang, pasal, nominal bulat, dan tanggal jatuh tempo yang valid.');
     }
     const previous = input.id ? billsRef.current.find((bill) => bill.id === input.id) : undefined;
     if (input.id && !previous) throw new Error('Tagihan tidak ditemukan. Buka ulang daftar tagihan.');
@@ -209,10 +209,15 @@ export function BillsProvider({ children }: { children: ReactNode }) {
       notificationId: undefined,
     };
     let newNotificationId: string | undefined;
-
+    let reminderWarning: string | null = null;
     try {
       newNotificationId = await scheduleBillReminder(nextBill);
       nextBill.notificationId = newNotificationId;
+    } catch {
+      reminderWarning = 'Tagihan disimpan tanpa notifikasi. Periksa izin pengingat pada perangkat.';
+    }
+
+    try {
       const next = previous
         ? billsRef.current.map((bill) => (bill.id === id ? nextBill : bill))
         : [nextBill, ...billsRef.current];
@@ -224,9 +229,10 @@ export function BillsProvider({ children }: { children: ReactNode }) {
 
     if (previous?.notificationId) {
       await cancelBillReminder(previous.notificationId).catch(() => {
-        setError('Tagihan tersimpan, tetapi pengingat sebelumnya belum berhasil dibatalkan.');
+        reminderWarning = 'Tagihan tersimpan, tetapi pengingat lama belum berhasil dibatalkan.';
       });
     }
+    if (reminderWarning) setError(reminderWarning);
 
     return id;
   }), [enqueue, persist]);
@@ -344,8 +350,13 @@ export function BillsProvider({ children }: { children: ReactNode }) {
       recurrenceDay,
     };
 
+    let reminderWarning: string | null = null;
     try {
       restored.notificationId = await scheduleBillReminder(restored);
+    } catch {
+      reminderWarning = 'Pembatalan lunas tersimpan, tetapi pengingat belum terjadwal. Periksa izin notifikasi.';
+    }
+    try {
       await persist(
         billsRef.current
           .filter((item) => item.id !== successor?.id)
@@ -360,9 +371,10 @@ export function BillsProvider({ children }: { children: ReactNode }) {
 
     if (successor?.notificationId) {
       await cancelBillReminder(successor.notificationId).catch(() => {
-        setError('Pembayaran dibatalkan, tetapi pengingat periode berikutnya belum berhasil dibersihkan.');
+        reminderWarning = 'Pembayaran dibatalkan, tetapi pengingat periode berikutnya belum berhasil dibersihkan.';
       });
     }
+    if (reminderWarning) setError(reminderWarning);
   }), [enqueue, persist]);
 
   return (
