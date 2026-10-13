@@ -8,7 +8,7 @@
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --experimental-strip-types --test scripts/monthly-bills.test.mjs scripts/notification-tap.test.mjs scripts/reminder-target.test.mjs scripts/rupiah-format.test.mjs"
+    "test": "node --experimental-strip-types --test scripts/monthly-bills.test.mjs scripts/notification-tap.test.mjs scripts/reminder-target.test.mjs scripts/rupiah-format.test.mjs scripts/payment-actions-contract.test.mjs"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

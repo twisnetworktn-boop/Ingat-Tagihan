@@ -105,6 +105,7 @@ function BillCard({
               style={({ pressed }) => [styles.statusButton, { borderColor: colors.border, backgroundColor: 'transparent' }, pressed && styles.pressed]}
             >
               <Feather name="rotate-ccw" size={14} color={colors.action} />
+              <Text style={[styles.statusText, { color: colors.action }]}>Batalkan</Text>
             </Pressable>
           ) : (
             <Pressable
@@ -112,8 +113,11 @@ function BillCard({
               accessibilityLabel={`Konfirmasi pembayaran ${bill.title}`}
               hitSlop={10}
               onPress={onMarkPaid}
-              style={({ pressed }) => [styles.statusButton, { borderColor: colors.border, backgroundColor: 'transparent' }, pressed && styles.pressed]}
-            />
+              style={({ pressed }) => [styles.statusButton, { borderColor: colors.action, backgroundColor: colors.actionSoft }, pressed && styles.pressed]}
+            >
+              <Feather name="check" size={14} color={colors.action} />
+              <Text style={[styles.statusText, { color: colors.action }]}>Sudah bayar</Text>
+            </Pressable>
           )}
           <Pressable
             accessibilityRole="button"
@@ -134,7 +138,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { bills, loading, error, reload, deleteBill, markPaid, undoPaid } = useBills();
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<Filter>('unpaid');
   const [refreshing, setRefreshing] = useState(false);
   const [snapshotBillId, setSnapshotBillId] = useState<string | null>(null);
 
@@ -243,15 +247,15 @@ export default function HomeScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await reload();
-    setRefreshing(false);
+    try { await reload(); }
+    finally { setRefreshing(false); }
   };
 
   const header = (
     <View style={styles.headerContent}>
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Ayo Tagih</Text>
+      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Ingat Tagihan</Text>
       <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
-        Biar semua jatuh tempo tetap terpantau.
+        Catat, ingat, dan tandai saat sudah dibayar.
       </Text>
       <TopMenu active="bills" />
       {__DEV__ && Platform.OS !== 'web' && (
@@ -292,9 +296,9 @@ export default function HomeScreen() {
 
       <View style={styles.listHeading}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-          {filter === 'paid' ? 'Riwayat lunas' : 'Daftar tagihan'}
+          {filter === 'paid' ? 'Riwayat pembayaran' : filter === 'unpaid' ? 'Tagihan belum lunas' : 'Semua tagihan'}
         </Text>
-        <Text style={[styles.billCount, { color: colors.mutedForeground }]}>{bills.length}</Text>
+        <Text style={[styles.billCount, { color: colors.mutedForeground }]}>{visibleBills.length}</Text>
       </View>
       {error ? (
         <View style={[styles.errorBanner, { backgroundColor: colors.accent }]}>
@@ -304,9 +308,9 @@ export default function HomeScreen() {
       ) : null}
       <View style={styles.filters}>
         {([
-          ['all', 'Semua'],
           ['unpaid', 'Belum lunas'],
-          ['paid', 'Lunas'],
+          ['paid', 'Sudah lunas'],
+          ['all', 'Semua'],
         ] as const).map(([key, label]) => {
           const selected = filter === key;
           return (
@@ -337,16 +341,16 @@ export default function HomeScreen() {
         <Feather name={filter === 'paid' ? 'check-circle' : 'calendar'} size={24} color={colors.primary} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-        {filter === 'paid' ? 'Belum ada riwayat lunas' : filter === 'unpaid' ? 'Semua sudah beres' : 'Belum ada tagihan'}
+        {filter === 'paid' ? 'Belum ada pembayaran' : bills.length === 0 ? 'Belum ada tagihan' : filter === 'unpaid' ? 'Semua tagihan sudah lunas' : 'Belum ada tagihan'}
       </Text>
       <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>
         {filter === 'paid'
           ? 'Tagihan yang sudah kamu bayar akan muncul di sini.'
           : filter === 'unpaid'
-            ? 'Mantap, belum ada tagihan yang menunggu.'
+            ? bills.length === 0 ? 'Tambahkan tagihan pertama agar jatuh temponya mudah diingat.' : 'Tidak ada tagihan yang menunggu pembayaran.'
             : 'Tambahkan tagihan pertama supaya tanggal jatuh temponya tidak terlewat.'}
       </Text>
-      {filter === 'all' ? (
+      {bills.length === 0 && filter !== 'paid' ? (
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/bill-form')}
@@ -359,7 +363,7 @@ export default function HomeScreen() {
     </View>
   );
 
-  if (loading) {
+  if (loading && bills.length === 0 && !error) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <ActivityIndicator color={colors.primary} />
@@ -368,7 +372,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (error && bills.length === 0) {
+  if (error && bills.length === 0 && !loading) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <Feather name="alert-circle" size={28} color={colors.destructive} />
@@ -465,18 +469,19 @@ const styles = StyleSheet.create({
   billTop: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   categoryIcon: { width: 42, height: 42, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   billMain: { flex: 1, minWidth: 0 },
-  billTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  billTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
   billCategory: { marginTop: 3, fontFamily: 'Inter_400Regular', fontSize: 11 },
   amount: { fontFamily: 'Inter_700Bold', fontSize: 14, letterSpacing: -0.25 },
   paidText: { textDecorationLine: 'line-through', opacity: 0.65 },
   billDivider: { height: StyleSheet.hairlineWidth, marginVertical: 13 },
-  billBottom: { flexDirection: 'row', alignItems: 'center', minHeight: 26 },
+  billBottom: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 32, gap: 8 },
   dueTextWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  dueText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
+  dueText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
   reminderTag: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 4, paddingHorizontal: 7, paddingVertical: 5, marginLeft: 8 },
-  reminderTagText: { fontSize: 9, fontFamily: 'Inter_600SemiBold' },
+  reminderTagText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 11, marginLeft: 'auto', paddingLeft: 8 },
-  statusButton: { width: 23, height: 23, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  statusButton: { minHeight: 34, paddingHorizontal: 9, borderRadius: 6, borderWidth: 1.5, flexDirection: 'row', gap: 5, alignItems: 'center', justifyContent: 'center' },
+  statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   iconButton: { width: 27, height: 27, alignItems: 'center', justifyContent: 'center' },
   cardSpacer: { height: 10 },
   emptyCard: { borderRadius: 9, borderWidth: 1, padding: 23, alignItems: 'center', marginTop: 5 },
